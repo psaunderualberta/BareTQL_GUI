@@ -1,51 +1,30 @@
 <template>
-    <div>
-        <div class="separate-components centering">
+    <div id="seed-set">
+        <div class="separate-components centering" style="margin-bottom: 1%; ">
             <Logo />
         </div>
-
-        <!-- LHS of Webpage -->
-        <div class="page">
-            <div class="separate-components centering">
-                <h2>Please enter query information:</h2>
-                <hr style="width: 90%; margin-bottom: 20px;">
-                
-                <!-- Form to submit keyword queries -->
-                <form v-on:submit.prevent="submitQuery">
-                    <p v-if="errors.length">
-                        <strong>
-                            Please enter at least one keyword
-                        </strong>
-                    </p>
-                    
-                    <div class="inputField">
-                        <input type="text" id="keywords" 
-                            placeholder="Enter keyword(s)">
-                    </div>
-                    <br>
-                    <div class="inputField">
-                        <input type="submit">
-                    </div>
-                </form>
-            </div>
-            <hr>
-
-            <!-- Display for selected seed set rows -->
-            <div class="separate-components centering">
-                <h3>Seed Set</h3>
-                <p v-if="table['numRows'] === 0">
-                    No seed set rows have been selected
+        <div class="separate-components centering">            
+            <!-- Form to submit keyword queries -->
+            <form v-on:submit.prevent="submitQuery">
+                <p v-if="errors.length">
+                    <strong>
+                        Please enter at least one keyword
+                    </strong>
                 </p>
-                <div v-else>
-
-                    <!-- Table content -->
-                    <UserTable :table="table['rows']" />
-                    <button @click="postSeedSet">Use as Seed Set</button>
+                
+                <div class="inputField">
+                    <input type="text" id="keywords" 
+                        placeholder="Enter keyword(s)">
                 </div>
-            </div>
+                <br>
+                <div class="inputField">
+                    <input type="submit">
+                </div>
+            </form>
         </div>
 
-        <!-- RHS of Page -->
+
+        <!-- LHS of Page -->
         <div class="page">
             <div class="separate-components">
                 <div class="centering">
@@ -98,6 +77,24 @@
                 <p v-else class="centering">
                     No results for the previous query.
                 </p>
+            </div>
+        </div>
+
+        <!-- RHS of Webpage -->
+        <div class="page">
+
+            <!-- Display for selected seed set rows -->
+            <div class="separate-components centering">
+                <h3>Seed Set</h3>
+                <p v-if="table['numRows'] === 0">
+                    No seed set rows have been selected
+                </p>
+                <div v-else>
+
+                    <!-- Table content -->
+                    <UserTable :table="table['rows']" />
+                    <button @click="postSeedSet">Use as Seed Set</button>
+                </div>
             </div>
         </div>
     </div>
@@ -228,7 +225,7 @@ input {
 input[type='text'] {
     border: 5px solid white;
     height: 100%;
-    width: 35%;
+    width: 30%;
 }
 
 .top-most-li {

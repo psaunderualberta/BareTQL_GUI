@@ -73,7 +73,7 @@ input[type=checkbox]:checked + label {
 like an open book */
 .page {
     width: 46%;
-    margin: 1%;
+    margin: 0 1%;
     float: left;
 }
 
