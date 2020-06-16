@@ -4,7 +4,8 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
 */ 
 const sqlite3 = require('better-sqlite3');
-const leven = require('leven')
+const {similarity, distance} = require('talisman/metrics/jaro-winkler')
+const dice = require('talisman/metrics/dice');
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -31,13 +32,14 @@ class Database {
         }
         console.log("Connected to database");
 
-        this.db.function('leven', (str1, str2) => leven(str1, str2));
-        // this.db.loadExtension('./spellfix')                // for Linux
-        // this.db.loadExtension('./spellfix.dll')           //  <-- UNCOMMENT HERE FOR WINDOWS
+        this.db.function('jaro', (str1, str2) => similarity(str1, str2)); // Take max to get largest number of results
+        this.db.function('dice', (str1, str2) => dice(str1, str2))
 
         this.seedSet = {
             sliders: [],
             rows: [],
+            table_ids: '',
+            row_ids: '',
         };
 
         this.functions = {
@@ -142,6 +144,8 @@ class Database {
         this.seedSet = {
             sliders: [],
             rows: [],
+            table_ids: tableIDs.join(', '),
+            row_ids: rowIDs.join(', '),
         };
 
         /* Create 'table' based on values of tableIDs, rowIDs
@@ -288,6 +292,10 @@ class Database {
             try {
                 this.getRelatedTables()
                 .then((results) => {
+                    this.getRelatedRows(results)
+                })
+                .then((results) => {
+                    this.insertBestRows(results)                    
                     resolve();
                 })
                 .catch((error) => {
@@ -310,210 +318,56 @@ class Database {
     getRelatedTables() {
         /* 'key' refers to primary key, LH column.
          * 
-         * Iterate over all keys
-         * Check if length of key makes it possible to match.
-         * If keys match (based on levenshtein distance)
-         *     If that table contains the entire row
-         *         Add to list of potential tables
+         * Get titles of the tables with rows
+         * currently in the seed set.
          * 
-         * Count # of times each table shows up in
-         * list of potential tables
-         * 
-         * Only take tables which appear enough times
-         * 
-         * For each potential table:
-         *      Eliminate if table has fewer columns OR # of rows < self.num_rows * relational_threshold)
-         *      Determine column & row mapping, related score of table
-         *      If the related_score > relational_threshold: 
-         *          Add mappings, value to list of related tables
-         * 
-         * return list of related tables
+         * Find similar titles (HOW)
+         * Try:
+         *      - Dice
+         *      - Levenshtein
+         *      - Jaro-Winkler
          * 
          */ 
-    
+        var results = [];
+        var limit = 1.0;
+        var prom;
+
         return new Promise((resolve, reject) => {
-            var stmt, stmtString, params;
-            var rows = this.seedSet['rows']
-
-            try {
-
-                // Can't split rows into cells, since object keys cannot be arrays
-                var rowTables = { }
-                rows.forEach(row => {
-                    rowTables[row] = []
-                })
-
-                /* Identify tables with pk within edit distance of key */
-                var customTable = [];
-                var splitRow;
-                Object.keys(rowTables).forEach(row => {  
-                    customTable = [];
-                    splitRow = row.split(' || ');
-
-                    var customTable = this.makeTempTable(splitRow);
-                    /* Create 'table' based on values of splitRow cells, slider values
-                    * https://stackoverflow.com/questions/985295/can-you-define-literal-tables-in-sql
-                    * Accessed June 12th, 2020
-                    */
-                    
-                    stmtString = `
-                        -- Primary key specific 
-                        SELECT table_id, row_id
-                        FROM cells c
-                        WHERE c.col_id = 0
-                        AND row_id > 0
-                        AND leven(?, value) <= ?
-                    `;
- 
-                    /* kept separate, since if a row has only one column this
-                        second query will produce an empty set which we do not want */
-                    if (splitRow.length > 1) {
-                        stmtString += `
-                            INTERSECT
- 
-                            -- all other columns
-                            SELECT table_id, row_id
-                            FROM cells c, ${customTable} AS custom
-                            WHERE c.col_id > 0
-                            AND row_id > 0 -- Ensures we don't column headers in output
-                            AND leven(custom.word, c.value) < custom.edit_limit
-                            GROUP BY c.table_id, c.row_id
-                            HAVING COUNT(DISTINCT custom.word) = ?
-                            AND COUNT(DISTINCT c.col_id) = ? 
-                            AND MAX(c.col_id) >= ?
-                        `
-                        params = [splitRow[0], this.seedSet['sliders'][0], splitRow.length - 1, splitRow.length - 1, splitRow.length - 1];
-                    } else {
-                        params = [splitRow[0], this.seedSet['sliders'][0]];
-                    }
-                    stmt = this.db.prepare(stmtString)
-                    this.all(stmt, params, rowTables[row])
-                })
-
-                /* Organize results into object, where key is a table_id and
-                 * value is an array of all rows which match. There is no defined ordering,
-                 * although the query returns the rows in ascending order since that is how
-                 * they are represented in the database.
-                 */
-                var tables = { };
-                var sortedTables = [];
-                Object.keys(rowTables).forEach(key => {
-                    rowTables[key].forEach(result => {
-                        if (tables[result['table_id']]) {
-                            tables[result['table_id']].push(result['row_id'])
-                        } else {
-                            tables[result['table_id']] = [result['row_id']]
-                        }
-                    })
-                })
-
-                /* http://stackoverflow.com/questions/1069666/ddg#16794116
-                 * Accessed June 15th, 2020
-                 */
-                sortedTables = Object.keys(tables).sort((key1, key2) => {
-                    return tables[key1] - tables[key2]
-                }).reverse();
-
-                // console.log(tables);
-
-                var cMap;
-                try {
-                    Object.keys(tables).forEach(table_id => {
-                        cMap = this.getColumnMapping(table_id, tables[table_id])
-                    })
-                } catch (error) {
-                    console.log(err);
-                }
-                
-                resolve(sortedTables);
-
-            } catch(error) {
-                console.log(error);
-                reject(error)
-            }
-
-        })
+            do {
+                const stmt = this.db.prepare(`
+                    WITH currentTitles AS (
+                        SELECT table_id, title
+                        FROM titles
+                        WHERE table_id in (${this.seedSet['table_ids']})
+                    )
+                    SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
+                    FROM titles t, currentTitles c
+                    WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
+                    AND 
+                    (
+                        (dice(c.title, t.title) >= ${limit})
+                    );
+                `)
+                prom = this.all(stmt, [], results)
+                limit -= 0.05;
+            } while ( new Set(results.map(result => result['title'])).size <= 1 ); // At least two unique tables in results
+            prom
+            .then(() => {
+                console.log(results, limit)
+                resolve(results);
+            })
+            .catch((error) => {
+                reject(error);
+            })
+        });
     }
 
-    getColumnMapping(table_id, rowIDs) {
-        /* Gets the column mapping of the table with id 'table_id'
-         * to the current state of the seed set. The column mapping
-         * is defined as follows: For each row in the table
-         * which has been found to match a row in the seed set
-         * there is a number of possible orderings of the columns 
-         * to convert that row into the row in the seed set. We find
-         * these possible orderings, and the column mapping is the most common one.
-         * 
-         * Arguments:
-         * - table_id, the ID of the table to test
-         * 
-         * Returns:
-         * - object containing the column mapping from the table
-         *   to our seed set, the related score, and the row mapping
-         */
+    getRelatedRows(table_ids) {
 
-        var rowStr = [];
-        for (const row of rowIDs) {
-            rowStr.push(row);
-        }
-        rowIDs = `(${rowStr.join(', ')})`
+    }
 
-        var mappings;
-        var mappingCounts = [];
-        for (const row of this.seedSet['rows']) {
-            var customTable = this.makeTempTable(row.split(' || '))
-            
-            const stmt = this.db.prepare(`
-            WITH origin AS ${customTable}
-            SELECT GROUP_CONCAT(cols, ' || ') AS mapping
-            FROM (
-                SELECT table_id, row_id, word, GROUP_CONCAT(c.col_id, ', ') AS cols
-                FROM cells c, origin
-                WHERE table_id = ${table_id}
-                AND row_id IN ${rowIDs}
-                AND c.col_id > 0
-                AND leven(origin.word, c.value) < origin.edit_limit
-                GROUP BY table_id, row_id, word
-                )
-                GROUP BY table_id, row_id
-            `)
-            mappings = [];
-            this.all(stmt, [], mappings)
-            .then(() => {
-                if (mappings.length > 0) {
-                    console.log(mappings)
-                    mappings = mappings.map(mapping => mapping.split(' || ').map(cols => cols.split(', '))) // Undoes the above GROUP_CONCATs
-                    console.log(mappings)
-                    
-                    /* Count most frequent column mapping for each column */
-                    for (const row of mappings) {
-                        for (let i = 0; i < row.length; i++) {
-                            for (let j = 0; j < row[i].length; j++) {
-                                if (typeof mappingCounts[i] === 'undefined') {
-                                    mappingCounts[i] = { };
-                                }
-                                if (mappingCounts[i][row[i][j]]) mappingCounts[i][row[i][j]]++;
-                                else mappingCounts[i][row[i][j]] = 1;
-                            }
-                        }
-                    }
+    insertBestRows(candidateRows) {
 
-
-                    var colMap = [];
-                    for (const count of mappingCounts) {
-                        var max = Object.keys(count).sort((i, j) => count[j] -  count[i])[0]
-                        colMap.push(max);
-                    }
-
-                    return colMap
-
-                }
-            })
-            .catch((err) => {
-                console.log(err, mappings)
-                return null;
-            })
-        }
     }
 
     all(stmt, params = [], results) {
@@ -536,7 +390,7 @@ class Database {
                 })
                 res();
             } catch (error) {
-                console.log(err);
+                console.log(error);
                 rej(error)
             }
         })
@@ -621,9 +475,8 @@ module.exports = Database;
     TEST QUERIES: RUN IN TERMINAL   
 
     db.prepare(`
-    SELECT *
-    FROM cells
-    WHERE dice(value, '1982') >= 0.8;
-
+        SELECT title
+        FROM titles
+        WHERE lig('Olympic medalists in Biathlon', title) >= 0.5;
     `).all();
 */
