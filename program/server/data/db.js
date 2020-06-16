@@ -290,6 +290,9 @@ class Database {
                 .then((results) => {
                     resolve();
                 })
+                .catch((error) => {
+                    reject(error);
+                })
             } catch (error) {
                 reject(error);
             }
@@ -414,9 +417,13 @@ class Database {
                 // console.log(tables);
 
                 var cMap;
-                Object.keys(tables).forEach(table_id => {
-                    cMap = this.getColumnMapping(table_id, tables[table_id])
-                })
+                try {
+                    Object.keys(tables).forEach(table_id => {
+                        cMap = this.getColumnMapping(table_id, tables[table_id])
+                    })
+                } catch (error) {
+                    console.log(err);
+                }
                 
                 resolve(sortedTables);
 
@@ -454,32 +461,32 @@ class Database {
         var mappings;
         var mappingCounts = [];
         for (const row of this.seedSet['rows']) {
-            mappings = [];
             var customTable = this.makeTempTable(row.split(' || '))
-    
+            
             const stmt = this.db.prepare(`
-                WITH origin AS ${customTable}
-                SELECT GROUP_CONCAT(cols, ' || ') AS mapping
-                FROM (
-                    SELECT table_id, row_id, word, GROUP_CONCAT(c.col_id, ', ') AS cols
-                    FROM cells c, origin
-                    WHERE table_id = ${table_id}
-                    AND row_id IN ${rowIDs}
-                    AND c.col_id > 0
-                    AND leven(origin.word, c.value) < origin.edit_limit
-                    GROUP BY table_id, row_id, word
+            WITH origin AS ${customTable}
+            SELECT GROUP_CONCAT(cols, ' || ') AS mapping
+            FROM (
+                SELECT table_id, row_id, word, GROUP_CONCAT(c.col_id, ', ') AS cols
+                FROM cells c, origin
+                WHERE table_id = ${table_id}
+                AND row_id IN ${rowIDs}
+                AND c.col_id > 0
+                AND leven(origin.word, c.value) < origin.edit_limit
+                GROUP BY table_id, row_id, word
                 )
                 GROUP BY table_id, row_id
             `)
+            mappings = [];
             this.all(stmt, [], mappings)
             .then(() => {
-                console.log(mappings, mappings.length);
                 if (mappings.length > 0) {
-                    mappings.map(mapping => mapping['mapping'].split(' || ').map(cols => cols.split(', '))) // Undoes the above GROUP_CONCATs
-
-                    console.log(mappings, 'here')
+                    console.log(mappings)
+                    mappings = mappings.map(mapping => mapping.split(' || ').map(cols => cols.split(', '))) // Undoes the above GROUP_CONCATs
+                    console.log(mappings)
+                    
                     /* Count most frequent column mapping for each column */
-                    for (const row in mappings) {
+                    for (const row of mappings) {
                         for (let i = 0; i < row.length; i++) {
                             for (let j = 0; j < row[i].length; j++) {
                                 if (typeof mappingCounts[i] === 'undefined') {
@@ -492,20 +499,21 @@ class Database {
                     }
 
 
-                    mappings = [];
-                    for (const count in mappingCounts) {
-                        var max = Object.keys(count).sort((i, j) => count[i] - count[j])[-1]
-                        mappings.push(max);
+                    var colMap = [];
+                    for (const count of mappingCounts) {
+                        var max = Object.keys(count).sort((i, j) => count[j] -  count[i])[0]
+                        colMap.push(max);
                     }
 
-                    return mappings
+                    return colMap
 
                 }
             })
+            .catch((err) => {
+                console.log(err, mappings)
+                return null;
+            })
         }
-
-
-
     }
 
     all(stmt, params = [], results) {
@@ -528,7 +536,7 @@ class Database {
                 })
                 res();
             } catch (error) {
-                // console.log(err);
+                console.log(err);
                 rej(error)
             }
         })
