@@ -145,7 +145,8 @@ class ResultService {
             } else{
                 tables[item["table_id"]] = {
                     title: item['title'],
-                    rows: [item]
+                    rows: [item],
+                    rowCount: item['rowCount']
                 }
             }
             delete item["table_id"]

@@ -50,9 +50,11 @@
                             <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
                                 v-html="'List of '
                                         + makeKeywordsBold(table['title'], keywords) 
-                                        + ': (contains '
+                                        + ': ('
                                         + Object.keys(results[table_rank]['rows']).length
-                                        + ' matching rows)'">
+                                        + (Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ')
+                                        + results[table_rank]['rowCount']
+                                        + ' rows)'">
                             </label>
                                 
                             <!-- Rows of table -->

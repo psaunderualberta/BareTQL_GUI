@@ -74,7 +74,7 @@ class Database {
          * locations on same table, leading to repeated rows in output
          */
         const stmt = this.db.prepare(`
-            SELECT DISTINCT table_id, title, row_id, value
+            SELECT DISTINCT r.table_id, title, row_id, value, rowCount
             FROM
             (
                 SELECT t.table_id, t.title, c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
@@ -105,7 +105,18 @@ class Database {
                 GROUP BY t.table_id, c.row_id
     
                 ORDER BY location, t.table_id, c.row_id
-            );
+            ) r
+
+            LEFT JOIN 
+            
+            (
+                SELECT table_id, COUNT(DISTINCT row_id) AS rowCount
+                FROM cells
+                GROUP BY table_id
+            ) c
+            
+            ON r.table_id = c.table_id;
+
         `)
         return new Promise((resolve, reject) => {
             this.all(
