@@ -6,6 +6,7 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 const sqlite3 = require('better-sqlite3');
 const {similarity, distance} = require('talisman/metrics/jaro-winkler')
 const dice = require('talisman/metrics/dice');
+const moment = require('moment');
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -30,6 +31,7 @@ class Database {
             console.log(`Something went wrong with dbPath: ${dbPath}: ${error}`);
             return
         }
+
         console.log("Connected to database");
 
         this.db.function('jaro', (str1, str2) => similarity(str1, str2)); // Take max to get largest number of results
@@ -47,6 +49,8 @@ class Database {
             xc: this.xc,
             fill: this.fill,
         }
+
+        this.cellSep = ' || '
     } 
 
     keywordSearch(keywords, params = []) {
@@ -77,7 +81,7 @@ class Database {
             SELECT DISTINCT r.table_id, title, row_id, value, rowCount
             FROM
             (
-                SELECT t.table_id, t.title, c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
+                SELECT t.table_id, t.title, c.row_id, GROUP_CONCAT(c.value, '${this.cellSep}') AS value,
                     CASE k.location 
                         WHEN 'title' THEN '1'
                         WHEN 'caption' THEN '2'
@@ -92,7 +96,7 @@ class Database {
     
                 UNION
     
-                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
+                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, '${this.cellSep}') AS value,
                     CASE k.location 
                         WHEN 'title' THEN '1'
                         WHEN 'caption' THEN '2'
@@ -169,7 +173,7 @@ class Database {
         customTable = `(${customTable.join(' UNION ALL ')})`
 
         const stmt = this.db.prepare(` 
-            SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+            SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, '${this.cellSep}') AS value
             FROM cells 
             WHERE (table_id, row_id) IN ${customTable}
             GROUP BY table_id, row_id
@@ -184,7 +188,10 @@ class Database {
             )
             .then(() => {
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-                for (let i = 0; i < this.seedSet['rows'][0].split(' || ').length; i++) {
+                this.groupCols(this.seedSet['rows'])
+                console.log(this.seedSet['rows'])
+
+                for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
                     this.seedSet['sliders'].push(10);
                 }
                 resolve()
@@ -194,6 +201,55 @@ class Database {
                 reject(err)
             })
         })
+    }
+
+    groupCols(rows) {
+        /* Attempts to group columns based on similar datatypes
+         * The datatypes we are considering are: 'null', 'numerical',
+         * and 'text' if neither of these two options are satisfied.
+         * This is designed to be a general grouping measure, as 
+         * we provide the user with the option to manually rearrange cells themselves.
+         * Cells are only swapped across columns; they are not swapped between rows.
+         * 
+         * We are grouping the columns thusly: 
+         * [PRIMARY KEY (unchanged), ...text, ...numerical, ...empty cells]
+         * 
+         * Arguments:
+         * - rows: The array of rows, with cells separated with the phrase '||'
+         * 
+         * Returns:
+         * - the 'rows' argument with each row (possibly) rearranged according
+         *   to the description above.
+         */
+
+        var curRow;
+        
+        for (let i = 0; i < rows.length; i++) {
+            
+            /* Split rows into arrays of cells */
+            curRow = rows[i].split(' || ');
+            // console.log(curRow)
+            
+            /* I created this O(n) 'sorting' algorithm for 3 items w/ duplicates
+            * when solving the leetcode problem 'sort colours': 
+            * https://leetcode.com/problems/sort-colors/ */
+            var numPointer = 1;
+            var emptyPointer = 1;
+            
+            for (let j = 1; j < curRow.length; j++) {
+                if (curRow[j].length === 0) continue;
+                
+                this.swap(curRow, emptyPointer, j)
+                if (isNaN(curRow[emptyPointer])) {
+                    this.swap(curRow, emptyPointer, numPointer)
+                    numPointer++;
+                }
+
+                emptyPointer++;
+            }
+
+            rows[i] = curRow.join(' || ');
+        }
     }
 
     deleteCols(cols) {
@@ -218,14 +274,14 @@ class Database {
 
                 /* Delete columns in the table */
                 for (let i = 0; i < this.seedSet['rows'].length; i++) {
-                    row = this.seedSet['rows'][i].split(' || ')
+                    row = this.seedSet['rows'][i].split(this.cellSep)
                     cols.forEach(col => {
                         delete row[col - 1] // We use 1-indexing on front-end, convert to 0-indexing
                     })
 
                     row = row.filter(cell => typeof cell !== 'undefined')
                     if (row.length > 0) {
-                        this.seedSet['rows'][i] = row.join(' || ');
+                        this.seedSet['rows'][i] = row.join(this.cellSep);
                     } else {
                         this.seedSet['rows'][i] = row
                     }
@@ -471,6 +527,19 @@ class Database {
         }
         
         return qMarks
+    }
+
+    swap(arr, i, j) {
+        /* Swaps the elements at indices i, j in arr
+         * 
+         * Arguments:
+         * - arr: The array in which to swap elements
+         * - i,j: The indices of the elements to be swapped
+         * 
+         */
+        var tmp = arr[i]
+        arr[i] = arr[j];
+        arr[j] = tmp;
     }
 
     close() {

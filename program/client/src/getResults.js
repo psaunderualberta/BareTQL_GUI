@@ -162,6 +162,8 @@ class ResultService {
             
             tables[id]['rows'] = rows
         }
+
+        // console.log(tables);
         return tables;
     }
 
@@ -180,13 +182,16 @@ class ResultService {
          * - tables object, modified to use rank as key rather than table_id.
          * 
          */
-        let K = 1.5, B = 0.75
+
+        let K = 0.75, B = 0.3
         let rt = new Retrieval(K, B);
 
         var tableArr = ResultService.tablesToArray(tables)
+
         rt.index(tableArr)
 
         let results = rt.search(keywords)
+
         var rankedTables = [];
         var id;
         var table;

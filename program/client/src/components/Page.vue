@@ -72,7 +72,7 @@ input[type=checkbox]:checked + label {
 /* Divide the page into two 'halves',
 like an open book */
 .page {
-    width: 46%;
+    width: 48%;
     margin: 0 1%;
     float: left;
 }
