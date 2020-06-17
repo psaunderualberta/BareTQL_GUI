@@ -2,6 +2,19 @@
     <div id="seed-set">
         <div class="separate-components centering" style="margin-bottom: 1%; ">
             <Logo />
+
+            <Instruction ref="instruction-1">
+                <template #shown>
+                    <form v-on:submit.prevent="showInstructions">
+                        <button>Click me to learn how to use BareTQL!</button>
+                    </form>
+                </template>
+
+                <template #hidden>
+                    <p>Click!</p>
+                </template>
+            </Instruction>
+
         </div>
         <div class="separate-components centering">            
             <!-- Form to submit keyword queries -->
@@ -28,7 +41,18 @@
         <div class="page">
             <div class="separate-components">
                 <div class="centering">
+                    <Instruction ref="instruction-2">
+                        <template #shown>
+                            <p>Clicked</p>
+                        </template>
+                        
+                        <template #hidden>
+                            This the the 'Results' tab, where the results of your query will be shown.
+                        </template>
+                    </Instruction>
+
                     <h4>Results</h4>
+
                 </div>
 
                 <!-- List of tables for results -->
@@ -106,12 +130,14 @@
 import Logo from './Logo.vue'
 import ResultService from '../getResults.js'
 import UserTable from './UserTable.vue'
+import Instruction from './Instruction.vue'
 
 export default {
     name: 'SeedSet',
     components: {
         Logo,
-        UserTable
+        UserTable,
+        Instruction,
     },
 
     data: function() {
@@ -125,6 +151,18 @@ export default {
     },
 
     methods: {
+
+        showInstructions() {
+            for (let i = 1, p = Promise.resolve(); i <= this.numInstructions; i++) {
+                p = p.then(_ => new Promise(resolve => {
+                    console.log(this.$refs[`instruction-${i}`])
+                    this.$refs[`instruction-${i}`].click();
+                }))
+            }
+        },
+
+        /* Use single button in corner as measure of when to increment i */
+
         submitQuery() {
             /* Submits the keyword query to the backend,
              * assigns the result of the query (after formatting)
@@ -212,6 +250,9 @@ export default {
                 numRows: numRows,
                 numCols: numCols,
             }
+        },
+        numInstructions: function() {
+            return document.querySelectorAll('.instruction-component').length;
         }
     }
 }
