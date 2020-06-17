@@ -31,7 +31,7 @@
                     </tr>
                     <tr>
                         <td v-for="col in numCols" :key="col">
-                            <p class="slider-values">{{ sliderValues[col - 1] }}%</p>
+                            <p class="slider-values">{{ sliderValues[col - 1] }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
                     </tr>

@@ -132,13 +132,14 @@ export default {
              */
             this.errors = [];
             this.selectedRows = [];
-            this.keywords = this.document.querySelector('#keywords').value // Only update keywords here, not on change
+            var keywords = this.document.querySelector('#keywords').value // Only update keywords here, not on change
 
             // https://vuejs.org/v2/cookbook/form-validation.html
             if (this.keywords.length > 0) {
-                ResultService.getKeywords(this.keywords)
+                ResultService.getKeywords(keywords)
                 .then((data) => {
                     this.results = data
+                    this.keywords = keywords
                 }).catch((err) => {
                     console.log(err);
                 })     
