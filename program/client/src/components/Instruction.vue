@@ -18,23 +18,23 @@ export default {
         'index',
     ],
     methods: {
-handleClick() {
-    return new Promise(res => {
-        var popup = document.getElementById(`myPopup-${this.index}`);
-        popup.classList.toggle("show");
+        handleClick() {
+            return new Promise(res => {
+                var popup = document.getElementById(`myPopup-${this.index}`);
+                popup.classList.toggle("show");
 
-        /* Not totally sure what I've built here, but it works */
-        new Promise(resolve => {
-            document.querySelector(`#next-instruction-button-${this.index}`).addEventListener('click', () => {
-                return resolve();
+                /* Not totally sure what I've built here, but it works */
+                new Promise(resolve => {
+                    document.querySelector(`#next-instruction-button-${this.index}`).addEventListener('click', () => {
+                        return resolve();
+                    })
+                })
+                .then(() => {
+                    popup.classList.toggle("show");
+                    res();
+                })
             })
-        })
-        .then(() => {
-            popup.classList.toggle("show");
-            res();
-        })
-    })
-},
+        },
     }
 }
 </script>

@@ -2,7 +2,20 @@
     <div>
         <div class="separate-components centering">
             <Logo />
-            <button @click="goBack">Click to return to Keyword Search</button>
+            <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
+                <template #shown>
+                    <button @click="showInstructions">Learn about Part 2 of BareTQL</button>
+                </template>
+
+                <template #hidden>
+                    <p>
+                        This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
+                        in the previous section and find different rows in the database that match the seed set, based on parameters that you choose.
+                    </p>
+                </template>
+            </Instruction>
+     
+            <button @click="goBack">Return to Keyword Search</button>
         </div>
 
         <!--  -->
@@ -48,6 +61,7 @@ import Logo from './Logo.vue'
 import ButtonList from './ButtonList.vue'
 import UserTable from './UserTable.vue'
 import ResultService from '../getResults'
+import Instruction from './Instruction.vue'
 
 export default {
     name: 'Operations',
@@ -55,6 +69,7 @@ export default {
         Logo,
         ButtonList,
         UserTable,
+        Instruction,
     },
 
     data: function() {
@@ -70,10 +85,17 @@ export default {
             table: [],
             deletions: [],
             sliderValues: [],
+            document: document,
         }
     },
 
     methods: {
+        async showInstructions() {
+            for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
+                await this.$refs[`instruction-${i}`].handleClick();
+            }
+        },
+
         executeDotOp: function() {
             ResultService.handleDotOps(this.dotOp, this.sliderValues)
             .then((data) => {

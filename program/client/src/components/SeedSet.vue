@@ -178,8 +178,7 @@ export default {
     methods: {
 
         async showInstructions() {
-            for (let i = 1; i <= this.numInstructions; i++) {
-                console.log(i)
+            for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
                 await this.$refs[`instruction-${i}`].handleClick();
             }
         },
@@ -274,9 +273,6 @@ export default {
                 numCols: numCols,
             }
         },
-        numInstructions: function() {
-            return document.querySelectorAll('.instruction-component').length;
-        }
     }
 }
 
