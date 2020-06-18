@@ -1,11 +1,11 @@
 <!-- https://www.w3schools.com/howto/howto_js_popup.asp -->
 <template>
     <div class="instruction-component">
-        <slot name="shown"></slot>
         <div class="popup">
+            <slot name="shown"></slot>
             <div class="popuptext" :id="'myPopup-'+index" >
                 <slot name="hidden" @click="unclick"></slot>
-                <button :id="'next-instruction-button-'+index">Next</button>
+                <button v-on:submit.prevent name="button-text" :id="'next-instruction-button-'+index">Next</button>
             </div>
         </div>
     </div>
@@ -18,23 +18,23 @@ export default {
         'index',
     ],
     methods: {
-        async handleClick() {
-            return new Promise(res => {
-                var popup = document.getElementById(`myPopup-${this.index}`);
-                popup.classList.toggle("show");
+handleClick() {
+    return new Promise(res => {
+        var popup = document.getElementById(`myPopup-${this.index}`);
+        popup.classList.toggle("show");
 
-                /* Not totally sure what I've built here, but it works */
-                new Promise(resolve => {
-                    document.querySelector(`#next-instruction-button-${this.index}`).addEventListener('click', () => {
-                        return resolve();
-                    })
-                })
-                .then(() => {
-                    popup.classList.toggle("show");
-                    res();
-                })
+        /* Not totally sure what I've built here, but it works */
+        new Promise(resolve => {
+            document.querySelector(`#next-instruction-button-${this.index}`).addEventListener('click', () => {
+                return resolve();
             })
-        },
+        })
+        .then(() => {
+            popup.classList.toggle("show");
+            res();
+        })
+    })
+},
     }
 }
 </script>
@@ -45,14 +45,16 @@ export default {
 .popup {
   position: relative;
   cursor: pointer;
+  align-items: center;
 }
 
 /* The actual popup (appears on top) */
 .popup .popuptext {
+  font-size: 0.9em;
   visibility: hidden;
   width: 160px;
   background-color: #555;
-  color: #fff;
+  color: inherit;
   text-align: center;
   border-radius: 6px;
   padding: 2%;
@@ -60,7 +62,7 @@ export default {
   z-index: 1;
   bottom: 125%;
   left: 50%;
-  margin-left: -80px;
+  margin-left: -100px;
 }
 
 /* Popup arrow */

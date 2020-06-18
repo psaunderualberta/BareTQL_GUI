@@ -81,22 +81,25 @@ class Database {
             SELECT DISTINCT r.table_id, title, row_id, value, rowCount
             FROM
             (
-                SELECT t.table_id, t.title, c.row_id, GROUP_CONCAT(c.value, '${this.cellSep}') AS value,
+                SELECT DISTINCT t.table_id, t.title, c.row_id, value,
                     CASE k.location 
                         WHEN 'title' THEN '1'
                         WHEN 'caption' THEN '2'
                         WHEN 'header' THEN '3'
                         WHEN 'cell' THEN '4'
                     END AS location
-                FROM titles t, keywords_cell_header k, cells c
-                WHERE t.table_id = k.table_id AND k.table_id = c.table_id
-                AND k.row_id = c.row_id
+                FROM titles t NATURAL JOIN keywords_cell_header k NATURAL JOIN (
+                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value 
+                    FROM cells 
+                    GROUP BY table_id, row_id
+                ) c
+                WHERE k.row_id = c.row_id
                 AND k.keyword IN ${keywordQMarks}
                 GROUP BY t.table_id, c.row_id
     
                 UNION
     
-                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, '${this.cellSep}') AS value,
+                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
                     CASE k.location 
                         WHEN 'title' THEN '1'
                         WHEN 'caption' THEN '2'

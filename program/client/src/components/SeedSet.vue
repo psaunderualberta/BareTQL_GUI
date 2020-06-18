@@ -3,27 +3,40 @@
         <div class="separate-components centering" style="margin-bottom: 1%; ">
             <Logo />
 
-            <Instruction ref="instruction-1" index="1">
-                <template #shown>
-                    <form v-on:submit.prevent="showInstructions">
-                        <button>Click me to learn how to use BareTQL!</button>
-                    </form>
-                </template>
-
-                <template #hidden>
-                    <p>Click!</p>
-                </template>
-            </Instruction>
 
         </div>
         <div class="separate-components centering">            
+            <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
+                <template #shown>
+                    <button @click="showInstructions">Click me to learn how to use BareTQL!</button>
+                </template>
+
+                <template #hidden>
+                    <p>
+                        Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables. <br>
+                        There are two parts to the tool: the screen you are looking at right now is the first screen, where keyword searching occurs.
+                    </p>
+                </template>
+            </Instruction>
+
+            <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
+
+                <template #hidden>
+                    <p>
+                        This is where you can enter keywords to search for in the database!<br>
+                        Separate individual keywords by a comma, and watch the results flow!
+                    </p>
+                </template>
+            </Instruction>
             <!-- Form to submit keyword queries -->
             <form v-on:submit.prevent="submitQuery">
-                <p v-if="errors.length">
-                    <strong>
-                        Please enter at least one keyword
-                    </strong>
-                </p>
+                        <p v-if="errors.length">
+                            <strong>
+                                Please enter at least one keyword
+                            </strong>
+                        </p>
+
+
                 
                 <div class="inputField">
                     <input type="text" id="keywords" 
@@ -41,7 +54,7 @@
         <div class="page">
             <div class="separate-components">
                 <div class="centering">
-                    <Instruction ref="instruction-2" index="2">
+                    <Instruction ref="instruction-3" index="3">
                         <template #shown>
                             <h4>Results</h4>
                         </template>
@@ -110,7 +123,7 @@
 
             <!-- Display for selected seed set rows -->
             <div class="separate-components centering">
-                <Instruction ref="instruction-3" index="3">
+                <Instruction ref="instruction-4" index="4">
                     <template #shown>
                         <h3>Seed Set</h3>
                     </template>
@@ -118,6 +131,11 @@
                     <template #hidden>
                         <p>This is where a preview of your seed set will be displayed</p>
                     </template>
+
+                    <template #button-text>
+                        End Tutorial
+                    </template>
+
                 </Instruction>
                 <p v-if="table['numRows'] === 0">
                     No seed set rows have been selected
@@ -160,13 +178,10 @@ export default {
     methods: {
 
         async showInstructions() {
-            var allButInstrs = this.document.querySelectorAll(':not(Instruction)')
-            allButInstrs.classList.toggle('dim')
             for (let i = 1; i <= this.numInstructions; i++) {
                 console.log(i)
                 await this.$refs[`instruction-${i}`].handleClick();
             }
-            allButInstrs.classList.toggle('dim')
         },
 
         /* Use single button in corner as measure of when to increment i */
@@ -280,9 +295,13 @@ input[type='text'] {
     width: 30%;
 }
 
-.dim {
-    opacity: 0.5;
+:not(Instruction *){
+    background: red;
 }
+
+/* .dim {
+    opacity: 0.5;
+} */
 
 .top-most-li {
     margin: 1%;
