@@ -3,9 +3,10 @@
     <div class="instruction-component">
         <slot name="shown"></slot>
         <div class="popup">
-            <span class="popuptext" id="myPopup" >
+            <div class="popuptext" :id="'myPopup-'+index" >
                 <slot name="hidden" @click="unclick"></slot>
-            </span>
+                <button :id="'next-instruction-button-'+index">Next</button>
+            </div>
         </div>
     </div>
 </template>
@@ -13,11 +14,26 @@
 <script>
 export default {
     name: 'instruction',
+    props: [
+        'index',
+    ],
     methods: {
-        click() {
-            var popup = document.getElementById("myPopup");
-            console.log(popup.textContent)
-            popup.classList.toggle("show");
+        async handleClick() {
+            return new Promise(res => {
+                var popup = document.getElementById(`myPopup-${this.index}`);
+                popup.classList.toggle("show");
+
+                /* Not totally sure what I've built here, but it works */
+                new Promise(resolve => {
+                    document.querySelector(`#next-instruction-button-${this.index}`).addEventListener('click', () => {
+                        return resolve();
+                    })
+                })
+                .then(() => {
+                    popup.classList.toggle("show");
+                    res();
+                })
+            })
         },
     }
 }
@@ -28,7 +44,6 @@ export default {
  /* Popup container */
 .popup {
   position: relative;
-  display: inline-block;
   cursor: pointer;
 }
 
@@ -40,7 +55,7 @@ export default {
   color: #fff;
   text-align: center;
   border-radius: 6px;
-  padding: 8px 0;
+  padding: 2%;
   position: absolute;
   z-index: 1;
   bottom: 125%;

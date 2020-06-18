@@ -3,7 +3,7 @@
         <div class="separate-components centering" style="margin-bottom: 1%; ">
             <Logo />
 
-            <Instruction ref="instruction-1">
+            <Instruction ref="instruction-1" index="1">
                 <template #shown>
                     <form v-on:submit.prevent="showInstructions">
                         <button>Click me to learn how to use BareTQL!</button>
@@ -41,9 +41,9 @@
         <div class="page">
             <div class="separate-components">
                 <div class="centering">
-                    <Instruction ref="instruction-2">
+                    <Instruction ref="instruction-2" index="2">
                         <template #shown>
-                            <p>Clicked</p>
+                            <h4>Results</h4>
                         </template>
                         
                         <template #hidden>
@@ -51,7 +51,6 @@
                         </template>
                     </Instruction>
 
-                    <h4>Results</h4>
 
                 </div>
 
@@ -111,7 +110,15 @@
 
             <!-- Display for selected seed set rows -->
             <div class="separate-components centering">
-                <h3>Seed Set</h3>
+                <Instruction ref="instruction-3" index="3">
+                    <template #shown>
+                        <h3>Seed Set</h3>
+                    </template>
+
+                    <template #hidden>
+                        <p>This is where a preview of your seed set will be displayed</p>
+                    </template>
+                </Instruction>
                 <p v-if="table['numRows'] === 0">
                     No seed set rows have been selected
                 </p>
@@ -146,19 +153,20 @@ export default {
             results: "",
             errors: [],
             selectedRows: [],
-            document: document,     
+            document: document,  
         }
     },
 
     methods: {
 
-        showInstructions() {
-            for (let i = 1, p = Promise.resolve(); i <= this.numInstructions; i++) {
-                p = p.then(_ => new Promise(resolve => {
-                    console.log(this.$refs[`instruction-${i}`])
-                    this.$refs[`instruction-${i}`].click();
-                }))
+        async showInstructions() {
+            var allButInstrs = this.document.querySelectorAll(':not(Instruction)')
+            allButInstrs.classList.toggle('dim')
+            for (let i = 1; i <= this.numInstructions; i++) {
+                console.log(i)
+                await this.$refs[`instruction-${i}`].handleClick();
             }
+            allButInstrs.classList.toggle('dim')
         },
 
         /* Use single button in corner as measure of when to increment i */
@@ -270,6 +278,10 @@ input[type='text'] {
     border: 5px solid white;
     height: 100%;
     width: 30%;
+}
+
+.dim {
+    opacity: 0.5;
 }
 
 .top-most-li {
