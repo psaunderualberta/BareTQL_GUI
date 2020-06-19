@@ -21,8 +21,9 @@
                 <template #hidden>
                     <p>
                         <br>
-                        This is where you can enter keywords to search for in the database!<br>
-                        Separate individual keywords by a comma, and watch the results flow!
+                        This is where you can enter keywords to search for in the database.<br>
+                        Separate individual keywords by a comma, and watch the results flow! Note
+                        that common words like 'the' or 'and' will take longer to query.
                     </p>
                 </template>
             </Instruction>
@@ -68,8 +69,12 @@
                 <ul v-if="Object.keys(results).length > 0">
 
                     <!-- Summary of results -->
-                    <p class="centering">
-                        There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'.<br>
+                    <p v-if="Object.keys(results).length === 20" class="centering">
+                        These are the top 20 tables that match the keywords '{{ keywords }}'. <br>
+                        Click on a title to view the table's rows.
+                    </p>
+                    <p v-else class="centering">
+                        There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'. <br>
                         Click on a title to view the table's rows.
                     </p>
 
