@@ -72,6 +72,14 @@ class ResultService {
     }
 
     static swapCells(indices) {
+        /* Handles the swapping of the cells the user selected
+         * 
+         * Arguments:
+         * - indices: an array of arrays containing the row and column indices of the 
+         *      cells to be swapped
+         * 
+         * Returns:
+         * - Promise: Resolves if successfully swapped cells, rejects otherwise */
         return new Promise((resolve, reject) => {
             try {
                 var url = `${swapURL}${indices.map(index => index[0]).join('&rowIDs=')}&colIDs=${indices.map(index => index[1]).join('&colIDs=')}`

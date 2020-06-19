@@ -112,12 +112,14 @@ export default {
 
     methods: {
         async showInstructions() {
+            /* Shows the 'slideshow' of Instruction components */
             for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
                 await this.$refs[`instruction-${i}`].handleClick();
             }
         },
 
-        executeDotOp: function() {
+        executeDotOp() {
+            /* Executes the dot op selected by user */
             ResultService.handleDotOps(this.dotOp, this.sliderValues)
             .then((data) => {
                 this.handleResponse(data);
@@ -127,7 +129,8 @@ export default {
             })
         },
 
-        deleteCols: function() {
+        deleteCols() {
+            /* Deletes all columns that the user has selected */
             ResultService.deleteCols(this.deletions)
             .then((data) => {
                 this.handleResponse(data)
@@ -138,7 +141,8 @@ export default {
             })
         },
 
-        handleResponse: function(data) {
+        handleResponse(data) {
+            /* handles the response from the API when receiving a modified seed set */
             var cellCount = 0;
             this.table = [];
             this.numCols = 0;
@@ -162,11 +166,13 @@ export default {
 
             this.nullCount = this.table.length * this.numCols - cellCount
         },
-        changeOp: function(newOp) {
+        changeOp(newOp) {
+            /* Changes the operation, activated from ButtonList emission */
             this.dotOp = newOp;
         },
 
         swapCells(indices) {
+            /* Swaps the two cells selected by the user */
             ResultService.swapCells(indices)
             .then((data) => {
                 this.handleResponse(data);
@@ -176,7 +182,8 @@ export default {
             })
         },
 
-        goBack: function() {
+        goBack() {
+            /* Emits a function to change the screen back to keyword search */
             this.$emit('ChangeMode')
         },
 
@@ -191,7 +198,8 @@ export default {
     },
 
 
-    created: function() {
+    created() {
+        /* Initial call to get the Seed Set from the API */
         ResultService.handleDotOps(undefined, this.sliderValues)
         .then((data) => {
             this.handleResponse(data);
@@ -201,7 +209,8 @@ export default {
         })
     },
 
-    updated: function() {
+    updated() {
+        /* Adjusts number of columns when table is updated */
         this.table.forEach(row => {
             this.numCols = Math.max(row.length, this.numCols)
         })

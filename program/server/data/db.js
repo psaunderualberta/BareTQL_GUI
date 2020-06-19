@@ -245,6 +245,17 @@ class Database {
     }
 
     swapCells(rowIDs, colIDs) {
+        /* Swaps the two cells selected by the user, denoted
+         * by the positions of values in rowIDs, colIDs
+         * 
+         * Arguments:
+         * - rowIDs: the row ids of the cells to be swapped in the seed set
+         * - colIDs: the column ids of the cells to be swapped, matching indices
+         *      with rowIDs
+         * 
+         * Returns:
+         * - Promise which resolves if cells were successfully swapped, rejection otherwise */
+        
         return new Promise((resolve, reject) => {
             try {
                 var rows = this.seedSet['rows'].map(row => row.split(' || '))

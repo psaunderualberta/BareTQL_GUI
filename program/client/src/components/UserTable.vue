@@ -39,20 +39,24 @@ export default {
     },
     methods: {
         formatSelectedCells() {
+            /* Formats the selected cells into an array of arrays of numbers */
             var formatted = []
             for (let i = 0; i < this.selectedCells.length; i++)
                 formatted.push(this.selectedCells[i].split('-').map(i => Number(i)))
             return formatted;
         },
         getSelectedContent() {
+            /* Gets the cell content from table based on 
+             * the return value of formatSelectedCells */
             var content = []
             for (const indices of this.formatSelectedCells())
                 content.push(this.table[indices[0]][indices[1]])
             return content
         },
         swap() {
+            /* Tells parent to swap selected cells */
             this.$emit('swap', this.formatSelectedCells())
-            this.selectedCells = [];
+            this.selectedCells = []; // reset selected cells
         }
     }
 }
