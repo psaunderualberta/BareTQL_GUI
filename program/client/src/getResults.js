@@ -1,11 +1,24 @@
 const axios = require('axios');
-const Retrieval = require('retrieval')
+const bm25 = require('wink-bm25-text-search')
+const nlp = require('wink-nlp-utils')
 
 const kwURL = 'http://localhost:3000/api/results/keyword/?keyword='; // hardcoded for now
 const seedSetURL = 'http://localhost:3000/api/results/seed-set/?tableIDs=';
 const dotOpURL = 'http://localhost:3000/api/results/dot-op/?dotOp='
 const deleteURL = 'http://localhost:3000/api/results/delete/?del='
 const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
+
+var engine = bm25();
+const pipe = [
+    nlp.string.lowerCase,
+    nlp.string.tokenize0,
+    nlp.tokens.removeWords,
+    nlp.tokens.stem,
+    nlp.tokens.propagateNegations
+];
+  
+engine.defineConfig( { fldWeights: { title: 2, rows: 1 } } );
+engine.definePrepTasks( pipe );
 
 class ResultService {
     
@@ -193,7 +206,6 @@ class ResultService {
         /* This function ranks the tables returned by 
          * the keyword search based on the Okapi BM25 
          * retrieval function, where D is a given table,
-         * Q is the array of keywords, k_1 = 1.5, and b = 0.75.
          * https://en.wikipedia.org/wiki/Okapi_BM25
          * 
          * Arguments: 
@@ -205,21 +217,38 @@ class ResultService {
          * 
          */
 
-        let K = 0.75, B = 0.3
-        let rt = new Retrieval(K, B);
 
-        var tableArr = ResultService.tablesToArray(tables)
+        /* Standard pipe and config from Wink-bm25 documentation
+         * https://www.npmjs.com/package/wink-bm25-text-search
+         * Accessed June 19th, 2020 */
+        var engine = bm25();
+        const pipe = [
+            nlp.string.lowerCase,
+            nlp.string.tokenize0,
+            nlp.tokens.removeWords,
+            nlp.tokens.stem,
+        ];
+        
+        // Preparatory tasks
+        engine.defineConfig( { 
+            fldWeights: { title: 1, rows: 1 },
+            bm25Params: { k1: 1.2, b: 0.3, k: 0.75 }
+        } );
+        engine.definePrepTasks( pipe );
+        ResultService.addTablesToEngine(tables, engine)
 
-        rt.index(tableArr)
+        // Indexing
+        engine.consolidate()
 
-        let results = rt.search(keywords)
+        // Searching
+        let results = engine.search( keywords, 20 )
 
         var rankedTables = [];
         var id;
         var table;
 
         results.forEach(result => {
-            id = result.split(' - ')[0] // Get table id
+            id = result[0]
             table = tables[id]
             rankedTables.push({
                 table_id: id,
@@ -231,7 +260,7 @@ class ResultService {
 
     }
 
-    static tablesToArray(tables) {
+    static addTablesToEngine(tables, engine) {
         /* Organizes the tables into an array of the following form:
          * [
          *    "<table_id> - <string of rows, no separators>"
@@ -246,17 +275,12 @@ class ResultService {
          */
         
          // TODO: Somehow include a bias for the location of the keywords
-         var tableArr = [];
-         var rows;
-         var str;
+         var curTable = { };
          Object.keys(tables).forEach(table_id => {
-                                                                    /* Join rows, split cells on separator, join cells with space */
-            rows = `${tables[table_id]['title']} ${Object.values(tables[table_id]['rows']).join(' ').split(' || ').join(' ')}`;
-            str = `${table_id} - ${rows}`
-            tableArr.push(str);
+            curTable['title'] = tables[table_id]['title']           /* Join rows, split cells on separator, join cells with space */
+            curTable['rows'] = Object.values(tables[table_id]['rows']).join(' ').split(' || ').join(' ')
+            engine.addDoc(curTable, table_id)
          })
-
-         return tableArr
     }
 }
 

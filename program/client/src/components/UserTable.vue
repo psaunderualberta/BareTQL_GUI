@@ -63,7 +63,7 @@ export default {
 
 </script>
 
-<style>
+<style scope>
 
 table {
     margin: 0 auto;

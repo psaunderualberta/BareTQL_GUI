@@ -20,6 +20,7 @@
 
                 <template #hidden>
                     <p>
+                        <br>
                         This is where you can enter keywords to search for in the database!<br>
                         Separate individual keywords by a comma, and watch the results flow!
                     </p>
@@ -38,7 +39,7 @@
                 </div>
                 <br>
                 <div class="inputField">
-                    <input type="submit">
+                    <button type="submit" id="submit-query-button">Submit Query</button>
                 </div>
             </form>
         </div>
@@ -54,7 +55,9 @@
                         </template>
                         
                         <template #hidden>
-                            This the the 'Results' tab, where the results of your query will be shown.
+                            <p>
+                                This the the 'Results' tab, where the results of your query will be shown.
+                            </p>
                         </template>
                     </Instruction>
 
@@ -161,7 +164,7 @@ export default {
 
     data: function() {
         return {
-            keywords: 'Australia, Cat',
+            keywords: '',
             results: "",
             errors: [],
             selectedRows: [],
@@ -172,9 +175,15 @@ export default {
     methods: {
 
         async showInstructions() {
+            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input")
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = true; inp.style.opacity = 0.5}
+
             for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
                 await this.$refs[`instruction-${i}`].handleClick();
             }
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = false; inp.style.opacity = 1}
         },
 
         /* Use single button in corner as measure of when to increment i */
@@ -184,22 +193,34 @@ export default {
              * assigns the result of the query (after formatting)
              * to the 'results' data
              */
+            var changeButton = function(button, content, state, opacity) {
+                button.textContent = content;
+                button.disabled = state;
+                button.style.opacity = opacity;
+            }
+
             this.errors = [];
             this.selectedRows = [];
             var keywords = this.document.querySelector('#keywords').value // Only update keywords here, not on change
+            var submitButton = this.document.querySelector('#submit-query-button')
 
             // https://vuejs.org/v2/cookbook/form-validation.html
-            if (this.keywords.length > 0) {
+            if (keywords.length > 0) {
+                changeButton(submitButton, "Loading...", true, 0.5);
                 ResultService.getKeywords(keywords)
+                
                 .then((data) => {
+                    changeButton(submitButton, "Submit Query", false, 1);
                     this.results = data
                     this.keywords = keywords
+
                 }).catch((err) => {
+                    changeButton(submitButton, err, false, 1);
                     console.log(err);
                 })     
             } else {
                 if (this.keywords.length === 0) {
-                        this.errors.push(0); // Need at least one item, doesn't matter what
+                    this.errors.push(0); // Need at least one item, doesn't matter what
                 }
 
             }

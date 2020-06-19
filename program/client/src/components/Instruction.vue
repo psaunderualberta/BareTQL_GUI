@@ -6,6 +6,7 @@
             <div class="popuptext" :id="'myPopup-'+index" >
                 <slot name="hidden" @click="unclick"></slot>
                 <button v-on:submit.prevent 
+                        class="instruction-button"
                         name="button-text" 
                         :id="'next-instruction-button-'+index"
                         style="cursor: pointer;"
