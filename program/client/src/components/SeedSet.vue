@@ -143,7 +143,7 @@
                 <div v-else>
 
                     <!-- Table content -->
-                    <UserTable :table="table['rows']" />
+                    <UserTable :table="table['rows']" :allowSelection="false"/>
                     <button @click="postSeedSet">Use as Seed Set</button>
                 </div>
             </div>

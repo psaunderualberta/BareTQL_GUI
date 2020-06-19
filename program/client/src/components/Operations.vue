@@ -71,7 +71,7 @@
                     </tr>
                 </tbody>
             </table>
-            <UserTable :table="table" />
+            <UserTable :table="table" :allowSelection="true"/>
 
         </div>
     </div>
