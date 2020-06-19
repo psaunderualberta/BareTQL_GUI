@@ -179,7 +179,10 @@ class Database {
             )
             .then(() => {
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-                this.groupCols(this.seedSet['rows'])
+
+                /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
+                if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
+
                 console.log(this.seedSet['rows'])
 
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {

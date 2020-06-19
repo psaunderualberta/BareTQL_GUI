@@ -25,7 +25,6 @@ class ResultService {
                 var url = kwURL + keywords.replace(new RegExp(/ *, */, 'gi'), () => {
                     return '&keyword='
                 })
-                // console.log(url);
 
                 axios.get(url)
                 .then((response) => {
