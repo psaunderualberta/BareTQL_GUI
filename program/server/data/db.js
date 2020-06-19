@@ -180,12 +180,23 @@ class Database {
             .then(() => {
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
 
+                var row;
+                var numCols = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+                
+                /* Pad each row with NULL until the table is a rectangle */
+                for (let i = 0; i < this.seedSet['rows'].length; i++) {
+                    row = this.seedSet['rows'][i].split(' || ')
+                    for (let j = row.length; j < numCols; j++) row.push("NULL")
+                    this.seedSet['rows'][i] = row.join(' || ')
+                }
+
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
 
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
                     this.seedSet['sliders'].push(10);
                 }
+
                 resolve()
             })
             .catch((err) => {
@@ -229,7 +240,7 @@ class Database {
             var emptyPointer = 1;
             
             for (let j = 1; j < curRow.length; j++) {
-                if (curRow[j].length === 0) continue;
+                if (curRow[j] === "NULL") continue;
                 
                 this.swap(curRow, emptyPointer, j)
                 if (isNaN(curRow[emptyPointer])) {
@@ -255,7 +266,7 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if cells were successfully swapped, rejection otherwise */
-        
+
         return new Promise((resolve, reject) => {
             try {
                 var rows = this.seedSet['rows'].map(row => row.split(' || '))
