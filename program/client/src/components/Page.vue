@@ -72,11 +72,10 @@ input[type=checkbox]:checked + label {
 
 .page, .separate-components {
     padding: 1% 0;
-    margin-bottom: 1%;
     height: auto;
-    /* position: relative; */
 }
-/* Divide the page into two 'halves',
+
+/* Divide the webpage into two 'halves',
 like an open book */
 .page {
     width: 48%;
@@ -88,12 +87,10 @@ like an open book */
   text-align: center;
 }
 
-/* Display separation during development */
 .separate-components {
   /* border: 2px solid black; */
     border-radius: 5px;
     background: #2c2b2b;
-    margin: 1px;
 }
 
 

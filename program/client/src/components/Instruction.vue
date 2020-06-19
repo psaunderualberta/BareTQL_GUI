@@ -2,7 +2,6 @@
 <template>
     <div class="instruction-component">
         <div class="popup">
-            <slot name="shown"></slot>
             <div class="popuptext" :id="'myPopup-'+index" >
                 <slot name="hidden" @click="unclick"></slot>
                 <button v-on:submit.prevent 
@@ -15,6 +14,7 @@
                 </button>
             </div>
         </div>
+        <slot name="shown"></slot>
     </div>
 </template>
 
