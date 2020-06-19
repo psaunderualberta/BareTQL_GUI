@@ -285,14 +285,6 @@ input[type='text'] {
     width: 30%;
 }
 
-:not(Instruction *){
-    background: red;
-}
-
-/* .dim {
-    opacity: 0.5;
-} */
-
 .top-most-li {
     margin: 1%;
 }

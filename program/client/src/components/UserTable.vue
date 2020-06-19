@@ -12,11 +12,11 @@
                         <div v-if="allowSelection">
                             <input type="checkbox" :id="row_index+'-'+col_index" :value="row_index+'-'+col_index" v-model="selectedCells">
                             <label :for="row_index+'-'+col_index">
-                                {{ cell.length === 0 ? 'NULL' : cell }}
+                                {{ cell }}
                             </label>
                         </div>
                         <div v-else>
-                            {{ cell.length === 0 ? 'NULL' : cell }}
+                            {{ cell }}
                         </div>
                     </td>
                 </tr>
