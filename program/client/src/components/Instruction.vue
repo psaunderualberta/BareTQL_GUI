@@ -63,7 +63,6 @@ export default {
   display: none;
   font-size: 0.9em;
   color: inherit;
-  width: 50%;
   text-align: center;
   border-radius: 6px;
   padding: 1%;

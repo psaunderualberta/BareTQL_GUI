@@ -65,6 +65,10 @@ input[type=checkbox]:checked + label {
     opacity: 0.5;
 }
 
+.deactivate {
+    opacity: 0.5;
+}
+
 .page, .separate-components {
     padding: 1% 0;
     margin-bottom: 1%;

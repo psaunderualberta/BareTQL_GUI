@@ -128,9 +128,15 @@ export default {
     methods: {
         async showInstructions() {
             /* Shows the 'slideshow' of Instruction components */
+            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input, labels")
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = true; inp.classList.toggle('deactivate')}
+
             for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
                 await this.$refs[`instruction-${i}`].handleClick();
             }
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = false; inp.classList.toggle('deactivate')}
         },
 
         executeDotOp() {
