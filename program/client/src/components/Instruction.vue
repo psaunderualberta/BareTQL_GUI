@@ -47,25 +47,29 @@ export default {
 
 <style scoped>
 
+.instruction-component {
+  padding-bottom: 1%;
+}
+
  /* Popup container */
 .popup {
   position: relative;
-  align-items: center;
 }
 
 /* The actual popup (appears on top) */
 .popup .popuptext {
-  font-size: 0.9em;
-  visibility: hidden;
   background-color: #555;
+  display: none;
+  font-size: 0.9em;
   color: inherit;
+  width: 50%;
   text-align: center;
   border-radius: 6px;
-  padding: 2%;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%;
-  left: 50%;
+  padding: 1%;
+  /* position: absolute;
+  z-index: 1; */
+  /* bottom: 125%;
+  left: 50%; */
   margin: 0 auto;
 }
 
@@ -83,7 +87,7 @@ export default {
 
 /* Toggle this class when clicking on the popup container (hide and show the popup) */
 .popup .show {
-  visibility: visible;
+  display: inline-block;
   -webkit-animation: fadeIn 1s;
   animation: fadeIn 1s
 }

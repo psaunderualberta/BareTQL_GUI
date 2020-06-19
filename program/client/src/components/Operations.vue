@@ -2,11 +2,7 @@
     <div>
         <div class="separate-components centering">
             <Logo />
-            <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
-                <template #shown>
-                    <button @click="showInstructions">Learn about Part 2 of BareTQL</button>
-                </template>
-
+            <Instruction ref="instruction-1" index="1">
                 <template #hidden>
                     <p>
                         This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
@@ -14,13 +10,14 @@
                     </p>
                 </template>
             </Instruction>
+            <button @click="showInstructions" style="margin-bottom:1%;">Learn about Part 2 of BareTQL</button> <br>
      
             <button @click="goBack">Return to Keyword Search</button>
         </div>
 
         <!--  -->
         <div class="separate-components centering">
-            <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
+            <Instruction ref="instruction-2" index="2">
                 <template #shown>
                     <h4>Please select one of the operations below</h4>
                 </template>
@@ -45,13 +42,22 @@
             </div>
 
             <!-- Deletion buttons, Sliders -->
-            <Instruction ref="instruction-3" index="3" style="padding-bottom: 1%;">
+            <Instruction ref="instruction-3" index="3">
 
                 <template #hidden>
                     <p>
                         These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
                         how similar you want the expanded rows to be for that column. 100% means only choose values that are currently in the column, 
                         0% means we can choose any values, and anything in between is a proportion of each.
+                    </p>
+                </template>
+            </Instruction>
+            <Instruction ref="instruction-4" index="4">
+
+                <template #hidden>
+                    <p>
+                        You can also delete a column by clicking on the 'delete column' button above each one. <br> 
+                        You can delete more than one column at the same time, as you will be prompted before the deletion will occur.
                     </p>
                 </template>
             </Instruction>
@@ -71,6 +77,15 @@
                     </tr>
                 </tbody>
             </table>
+            <Instruction ref="instruction-5" index="5">
+
+                <template #hidden>
+                    <p>
+                        These are the values of your seed set. If you want to swap values, simply click on the values
+                        you want to swap and a button will appear that will allow you to swap. 
+                    </p>
+                </template>
+            </Instruction>
             <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
 
         </div>

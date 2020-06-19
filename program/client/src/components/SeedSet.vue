@@ -7,10 +7,6 @@
         </div>
         <div class="separate-components centering">            
             <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
-                <template #shown>
-                    <button @click="showInstructions">Click me to learn how to use BareTQL!</button>
-                </template>
-
                 <template #hidden>
                     <p>
                         Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables. <br>
@@ -18,6 +14,7 @@
                     </p>
                 </template>
             </Instruction>
+            <button @click="showInstructions">Click me to learn how to use BareTQL!</button>
 
             <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
 
@@ -30,14 +27,11 @@
             </Instruction>
             <!-- Form to submit keyword queries -->
             <form v-on:submit.prevent="submitQuery">
-                        <p v-if="errors.length">
-                            <strong>
-                                Please enter at least one keyword
-                            </strong>
-                        </p>
-
-
-                
+                <p v-if="errors.length">
+                    <strong>
+                        Please enter at least one keyword
+                    </strong>
+                </p>
                 <div class="inputField">
                     <input type="text" id="keywords" 
                         placeholder="Enter keyword(s)">
