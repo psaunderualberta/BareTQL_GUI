@@ -180,7 +180,7 @@ export default {
     methods: {
 
         async showInstructions() {
-            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input, labels")
+            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input, label")
 
             for (let inp of Object.values(inputButtons)) {inp.disabled = true; inp.classList.toggle('deactivate')}
 
@@ -198,10 +198,10 @@ export default {
              * assigns the result of the query (after formatting)
              * to the 'results' data
              */
-            var changeButton = function(button, content, state, opacity) {
+            var changeButton = function(button, content) {
                 button.textContent = content;
-                button.disabled = state;
-                button.style.opacity = opacity;
+                button.disabled = !button.disabled;
+                button.classList.toggle('deactivate');
             }
 
             this.errors = [];
@@ -211,16 +211,16 @@ export default {
 
             // https://vuejs.org/v2/cookbook/form-validation.html
             if (keywords.length > 0) {
-                changeButton(submitButton, "Loading...", true, 0.5);
+                changeButton(submitButton, "Loading...");
                 ResultService.getKeywords(keywords)
 
                 .then((data) => {
-                    changeButton(submitButton, "Submit Query", false, 1);
+                    changeButton(submitButton, "Submit Query");
                     this.results = data
                     this.keywords = keywords
 
                 }).catch((err) => {
-                    changeButton(submitButton, err, false, 1);
+                    changeButton(submitButton, err);
                     console.log(err);
                 })     
             } else {
