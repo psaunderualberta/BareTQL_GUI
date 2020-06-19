@@ -36,8 +36,6 @@ export default {
 
 </script>
 
-
-
 <style>
 
 body {
@@ -49,16 +47,19 @@ ul {
     list-style: none;
 }
 
+
 input[type='submit'], button {
     border: 2px solid rgba(180, 180, 180, 0.8);
     height: 30px;
     border-radius: 2px;
     background: none;
     color:#80C080;
+    margin-bottom: 0.5%;
 }
 
+
 input[type=checkbox] {
-  visibility: hidden;
+    visibility: hidden;
 }
 
 input[type=checkbox]:checked + label {

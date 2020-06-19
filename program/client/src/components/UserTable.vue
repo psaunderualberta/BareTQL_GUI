@@ -2,7 +2,7 @@
     <div>
         <div v-if="allowSelection && selectedCells.length === 2"> <!-- 'allowSelection' is unnecessary, but keeping for clarity -->
             <button v-on:submit.prevent @click="swap">
-                Swap cells "{{ getSelectedContent().join('", "') }}""?
+                Swap selected cells
             </button>
         </div>
         <table>

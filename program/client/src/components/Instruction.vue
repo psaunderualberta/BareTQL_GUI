@@ -66,10 +66,7 @@ export default {
   text-align: center;
   border-radius: 6px;
   padding: 1%;
-  /* position: absolute;
-  z-index: 1; */
-  /* bottom: 125%;
-  left: 50%; */
+  max-width: 60%;
   margin: 0 auto;
 }
 
