@@ -20,7 +20,18 @@
 
         <!--  -->
         <div class="separate-components centering">
-            <h4>Please select one of the operations below</h4>
+            <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
+                <template #shown>
+                    <h4>Please select one of the operations below</h4>
+                </template>
+
+                <template #hidden>
+                    <p>
+                        These are the operations with which you can expand your seed set. <br>
+                        XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
+                    </p>
+                </template>
+            </Instruction>
             <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
             <button v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
                 Click to perform operation
@@ -34,6 +45,16 @@
             </div>
 
             <!-- Deletion buttons, Sliders -->
+            <Instruction ref="instruction-3" index="3" style="padding-bottom: 1%;">
+
+                <template #hidden>
+                    <p>
+                        These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
+                        how similar you want the expanded rows to be for that column. 100% means only choose values that are currently in the column, 
+                        0% means we can choose any values, and anything in between is a proportion of each.
+                    </p>
+                </template>
+            </Instruction>
             <table>
                 <tbody>
                     <tr>

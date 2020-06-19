@@ -5,7 +5,13 @@
             <slot name="shown"></slot>
             <div class="popuptext" :id="'myPopup-'+index" >
                 <slot name="hidden" @click="unclick"></slot>
-                <button v-on:submit.prevent name="button-text" :id="'next-instruction-button-'+index">Next</button>
+                <button v-on:submit.prevent 
+                        name="button-text" 
+                        :id="'next-instruction-button-'+index"
+                        style="cursor: pointer;"
+                        >
+                        Next
+                </button>
             </div>
         </div>
     </div>
@@ -44,7 +50,6 @@ export default {
  /* Popup container */
 .popup {
   position: relative;
-  cursor: pointer;
   align-items: center;
 }
 
@@ -52,7 +57,6 @@ export default {
 .popup .popuptext {
   font-size: 0.9em;
   visibility: hidden;
-  width: 160px;
   background-color: #555;
   color: inherit;
   text-align: center;
@@ -62,7 +66,7 @@ export default {
   z-index: 1;
   bottom: 125%;
   left: 50%;
-  margin-left: -100px;
+  margin: 0 auto;
 }
 
 /* Popup arrow */
