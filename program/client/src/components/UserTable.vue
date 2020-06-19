@@ -1,5 +1,10 @@
 <template>
     <div>
+        <div v-if="allowSelection && selectedCells.length === 2">
+            <button v-on:submit.prevent @click="swap">
+                Swap cells "{{ getSelectedContent().join('", "') }}""?
+            </button>
+        </div>
         <table>
             <tbody>
                 <tr v-for="(row, row_index) in table" :key="row_index">
@@ -17,7 +22,6 @@
                 </tr>
             </tbody>
         </table>
-        {{ selectedCells}}
     </div>
 </template>
 
@@ -31,6 +35,24 @@ export default {
     data: function() {
         return {
             selectedCells: []
+        }
+    },
+    methods: {
+        formatSelectedCells() {
+            var formatted = []
+            for (let i = 0; i < this.selectedCells.length; i++)
+                formatted.push(this.selectedCells[i].split('-').map(i => Number(i)))
+            return formatted;
+        },
+        getSelectedContent() {
+            var content = []
+            for (const indices of this.formatSelectedCells())
+                content.push(this.table[indices[0]][indices[1]])
+            return content
+        },
+        swap() {
+            this.$emit('swap', this.formatSelectedCells())
+            this.selectedCells = [];
         }
     }
 }

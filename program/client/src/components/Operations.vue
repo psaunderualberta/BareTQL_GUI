@@ -71,7 +71,7 @@
                     </tr>
                 </tbody>
             </table>
-            <UserTable :table="table" :allowSelection="true"/>
+            <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
 
         </div>
     </div>
@@ -164,6 +164,16 @@ export default {
         },
         changeOp: function(newOp) {
             this.dotOp = newOp;
+        },
+
+        swapCells(indices) {
+            ResultService.swapCells(indices)
+            .then((data) => {
+                this.handleResponse(data);
+            })
+            .catch((err) => {
+                console.log(err);
+            })
         },
 
         goBack: function() {

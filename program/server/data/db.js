@@ -183,8 +183,6 @@ class Database {
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
 
-                console.log(this.seedSet['rows'])
-
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
                     this.seedSet['sliders'].push(10);
                 }
@@ -244,6 +242,26 @@ class Database {
 
             rows[i] = curRow.join(' || ');
         }
+    }
+
+    swapCells(rowIDs, colIDs) {
+        return new Promise((resolve, reject) => {
+            try {
+                var rows = this.seedSet['rows'].map(row => row.split(' || '))
+    
+                var tmp = rows[rowIDs[0]][colIDs[0]]
+                rows[rowIDs[0]][colIDs[0]] = rows[rowIDs[1]][colIDs[1]]
+                rows[rowIDs[1]][colIDs[1]] = tmp;
+
+                this.seedSet['rows'] = rows.map(row => row.join(' || '))
+
+                resolve(this.seedSet);
+
+            } catch (err) {
+                reject(err);
+            }
+
+        })
     }
 
     deleteCols(cols) {
@@ -447,6 +465,9 @@ class Database {
             try {
                 const rows = stmt.all(params)
                 rows.forEach((row) => {
+                    // Set empty cells to be 'NULL'
+                    row['value'] = row['value'].split(' || ').map(cell => cell.length === 0 ? "NULL" : cell).join(' || ')
+
                     results.push(row);
                 })
                 res();

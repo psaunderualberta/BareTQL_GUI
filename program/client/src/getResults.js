@@ -5,6 +5,7 @@ const kwURL = 'http://localhost:3000/api/results/keyword/?keyword='; // hardcode
 const seedSetURL = 'http://localhost:3000/api/results/seed-set/?tableIDs=';
 const dotOpURL = 'http://localhost:3000/api/results/dot-op/?dotOp='
 const deleteURL = 'http://localhost:3000/api/results/delete/?del='
+const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
 
 class ResultService {
     
@@ -66,6 +67,20 @@ class ResultService {
                 })
             } catch (error) {
                 reject(error);
+            }
+        })
+    }
+
+    static swapCells(indices) {
+        return new Promise((resolve, reject) => {
+            try {
+                var url = `${swapURL}${indices.map(index => index[0]).join('&rowIDs=')}&colIDs=${indices.map(index => index[1]).join('&colIDs=')}`
+                axios.get(url)
+                .then((response) => {
+                    resolve(response['data']);
+                })
+            } catch (err) {
+                reject(err)
             }
         })
     }
