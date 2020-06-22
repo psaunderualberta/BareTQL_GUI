@@ -221,6 +221,10 @@ class ResultService {
         /* Standard pipe and config from Wink-bm25 documentation
          * https://www.npmjs.com/package/wink-bm25-text-search
          * Accessed June 19th, 2020 */
+        if (Object.keys(tables).length === 0) {
+            return {}
+        }
+
         var engine = bm25();
         const pipe = [
             nlp.string.lowerCase,

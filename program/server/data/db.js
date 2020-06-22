@@ -162,8 +162,8 @@ class Database {
         this.seedSet = {
             sliders: [],
             rows: [],
-            table_ids: tableIDs.join(', '),
-            row_ids: rowIDs.join(', '),
+            table_ids: tableIDs.map(id => id.trim()),
+            row_ids: rowIDs.map(id => id.trim()),
             numCols: 0,
         };
 
@@ -196,12 +196,7 @@ class Database {
                 var row;
                 this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
                 
-                /* Pad each row with NULL until the table is a rectangle */
-                for (let i = 0; i < this.seedSet['rows'].length; i++) {
-                    row = this.seedSet['rows'][i].split(' || ')
-                    for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
-                    this.seedSet['rows'][i] = row.join(' || ')
-                }
+                this.fillNulls()
 
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
@@ -378,6 +373,7 @@ class Database {
                 res();
             })
             .then(() => {
+                this.fillNulls()
                 resolve(this.seedSet)
             })
             .catch((err) => {
@@ -404,9 +400,6 @@ class Database {
             try {
                 this.getMatches()
                 .then((results) => {
-                    this.groupRows(results)
-                })
-                .then((results) => {
                     this.insertBestRows(results)                    
                     resolve();
                 })
@@ -414,7 +407,7 @@ class Database {
                     reject(error);
                 })
             } catch (error) {
-                reject(error);
+                console.log(error);
             }
         })
     }
@@ -436,37 +429,40 @@ class Database {
         var cur;
 
         var cells = this.seedSet['rows'].map(row => row.split(' || '))
-        console.log(cells)
 
         return new Promise((resolve, reject) => {
             try {
                 for (let i = 0; i < this.seedSet['numCols']; i++) {
-                    column = [];
-                    customTable = [];
-
                     for (let j = 0; j < this.seedSet['rows'].length; j++) {
                         cur = cells[j][i]
                         if (cur !== "NULL") {
                             column.push(cur);
-                            customTable.push(`SELECT '${cur}' AS word, ${this.seedSet['sliders'][i]} AS proximity_limit`)
+                            customTable.push(`SELECT '${cur}' AS word, ${i} AS col_id, ${this.seedSet['sliders'][i]} AS proximity_limit`)
                         }
                     }
-        
-                    customTable = customTable.join(' UNION ALL ')
-        
-                    stmt = this.db.prepare(`
-                        SELECT c.table_id, c.row_id, c.col_id, c.value, proximity(c.value, o.word) AS p
-                        FROM cells c, (${customTable}) o
-                        WHERE c.col_id = ?
-                        AND ABS(LENGTH(c.value) - LENGTH(o.word)) <= o.proximity_limit
-                        AND sameType(c.value, o.word) = 1
-                        AND proximity(c.value, o.word) <= o.proximity_limit;
-                    `)
-        
-                    this.all(stmt, [i], results);
-
-                    customTable = []
                 }
+        
+                customTable = customTable.join(' UNION ALL ')
+    
+                stmt = this.db.prepare(`
+                SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value, SUM(p) AS pSum
+                FROM 
+                (
+                    SELECT c.table_id, c.row_id, c.col_id, c.value, proximity(c.value, o.word) AS p
+                    FROM cells c, (${customTable}) o
+                    WHERE c.col_id = o.col_id
+                    AND ABS(LENGTH(c.value) - LENGTH(o.word)) <= o.proximity_limit
+                    AND sameType(c.value, o.word) = 1
+                    AND proximity(c.value, o.word) <= o.proximity_limit
+                )
+                GROUP BY table_id, row_id
+                HAVING COUNT(DISTINCT col_id) = ?
+                ORDER BY pSum ASC;
+                `)
+    
+                this.all(stmt, [this.seedSet['numCols']], results);
+
+                // console.log(results);
 
                 resolve(results)
             } catch (error) {
@@ -475,48 +471,25 @@ class Database {
         })
     }
 
-    groupRows(results) {
-
-        
+    insertBestRows(rows) {
         return new Promise((resolve, reject) => {
             try {
-                var stmt;
-                var customTable = [];
-                for (let result of results) {
-                    customTable.push(`
-                    SELECT ${result['table_id']} AS table_id,
-                    ${result['row_id']} AS row_id,
-                    ${result['col_id']} AS col_id,
-                    '${result['value']}' AS value,
-                    ${result['p']} AS p
-                    `)
-                }
+                var row = { };
 
-                console.log(customTable[0])
-                
-                customTable = customTable.join(" UNION ALL ")
-                
-                stmt = this.db.prepare(`
-                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || '), SUM(p) AS pSum
-                    FROM (${customTable})
-                    GROUP BY table_id, row_id
-                    HAVING COUNT(DISTINCT col_id) = ?
-                    ORDER BY pSum ASC;
-                `)                
-        
-                var rows = [];
-                this.all(stmt, this.seedSet['numCols'], rows)
-        
-                console.log(rows[0])
+                console.log(rows[0]);
+                for (let i = 0; i < rows.length; i++) {
+                    row = rows[i]
+                    if (row['pSum'] === 0) continue // Exact match, don't want a repeated row
+                    this.seedSet['rows'].push(row['value'])
+                    this.seedSet['table_ids'].push(row['table_id'])
+                    this.seedSet['row_ids'].push(row['row_id'])
+                }
                 resolve()
             } catch (error) {
                 reject(error)
             }
-        })
-    }
 
-    insertBestRows(rows) {
-        return
+        })
     }
 
     all(stmt, params = [], results) {
@@ -546,6 +519,16 @@ class Database {
                 rej(error)
             }
         })
+    }
+
+    fillNulls() {
+    /* Pad each row with NULL until the table is a rectangle */
+        var row;
+        for (let i = 0; i < this.seedSet['rows'].length; i++) {
+            row = this.seedSet['rows'][i].split(' || ')
+            for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
+            this.seedSet['rows'][i] = row.join(' || ')
+        }
     }
 
     makeStrArr(str) {

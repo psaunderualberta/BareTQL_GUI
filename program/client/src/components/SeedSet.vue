@@ -270,7 +270,7 @@ export default {
              * https://x-team.com/blog/highlight-text-vue-regex/
              * Accessed June 9th, 2020
              */
-            return str.replace(new RegExp(` ${keywords.split(/ *, */).join(' | ')} `, 'gi'), match => {
+            return str.replace(new RegExp(`[^a-zA-Z]${keywords.split(/ *, */).join(' | ')}[^a-zA-Z]`, 'gi'), match => {
                 return '<strong> ' + match + ' </strong>'
             })
         },
