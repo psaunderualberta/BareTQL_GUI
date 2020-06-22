@@ -14,7 +14,7 @@
                 </button>
             </div>
         </div>
-        <slot name="shown"></slot>
+        <slot name="shown"></slot> <!-- I hate how this tag sticks out -->
     </div>
 </template>
 

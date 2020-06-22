@@ -225,7 +225,6 @@ class ResultService {
         const pipe = [
             nlp.string.lowerCase,
             nlp.string.tokenize0,
-            // nlp.tokens.removeWords,
             nlp.tokens.stem,
         ];
         

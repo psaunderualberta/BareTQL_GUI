@@ -22,8 +22,8 @@
                     <p>
                         <br>
                         This is where you can enter keywords to search for in the database.<br>
-                        Separate individual keywords by a comma, and watch the results flow! Note
-                        that common words like 'the' or 'and' will take longer to query.
+                        Separate individual keywords by a comma, and then click the submit button below to run your query. Note
+                        that common words like 'the' or 'and' will take longer to query, just because they are more common in the database.
                     </p>
                 </template>
             </Instruction>
@@ -57,7 +57,8 @@
                         
                         <template #hidden>
                             <p>
-                                This the the 'Results' tab, where the results of your query will be shown.
+                                This the the 'Results' tab, where the results of your query will be shown, separated into tables. <br>
+                                Click on the title of a table to see its rows, and click on a row to add it to your seed set.
                             </p>
                         </template>
                     </Instruction>
@@ -79,7 +80,7 @@
                     </p>
 
                     <!-- Display for query results -->
-                    <form>
+                    <form style="font-size: 0.9em;">
                         <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
                             <!-- Row title, clicking on title reveals rows of table -->
                             <!-- /* https://codepen.io/Idered/pen/AeBgF */ -->
@@ -131,7 +132,10 @@
                     </template>
 
                     <template #hidden>
-                        <p>This is where a preview of your seed set will be displayed</p>
+                        <p>
+                            This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
+                            click the button below the table to move to the next portion of the app: Set Expansion.
+                        </p>
                     </template>
 
                     <template #button-text>
@@ -266,9 +270,8 @@ export default {
              * https://x-team.com/blog/highlight-text-vue-regex/
              * Accessed June 9th, 2020
              */
-
-            return str.replace(new RegExp(keywords.split(/ *, */).join('|'), 'gi'), match => {
-                return '<strong>' + match + '</strong>'
+            return str.replace(new RegExp(` ${keywords.split(/ *, */).join(' | ')} `, 'gi'), match => {
+                return '<strong> ' + match + ' </strong>'
             })
         },
 

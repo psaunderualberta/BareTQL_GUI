@@ -37,10 +37,12 @@ export default {
 </script>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
 
 body {
     background: #1f1e1e;
     color: #80C080;
+    font-family: "Roboto";
 }
 
 ul {
