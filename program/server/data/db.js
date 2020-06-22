@@ -196,7 +196,7 @@ class Database {
                 var row;
                 this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
                 
-                this.fillNulls()
+                this.fillNulls(this.seedSet['rows'])
 
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
@@ -351,7 +351,7 @@ class Database {
         
         return new Promise((resolve, reject) => {
             /* Only upon initialization of the dot-ops page */
-            if (dotOp === 'undefined') {
+            if (dotOp === 'undefined' || dotOp === undefined) {
                 resolve(this.seedSet)
             }
 
@@ -359,25 +359,29 @@ class Database {
                 this.seedSet['sliders'][i] = Number(sliderValues[i])
             }
             
+            /* Handle specific dot op */
             new Promise((res, rej) => {
                 if (dotOp === 'xr') {
                     this.xr()
+                    .then((results) => {
+                        res(results)
+                    })
                 } else if (dotOp === 'xc') {
                     this.xc()
-                    resolve()
                 } else if (dotOp === 'fill') {
                     this.fill()
-                    resolve()
                 } else {
                     rej(`dotOp specified (${dotOp}) is not possible`)
                 }
-                res();
             })
-            .then(() => {
-                this.fillNulls()
-                resolve(this.seedSet)
+            .then((results) => {
+                this.fillNulls(results)
+                var seedCopy = {...this.seedSet}
+                seedCopy['rows'] = results
+                resolve(seedCopy)
             })
             .catch((err) => {
+                console.log(err)
                 reject(err);
             })
         })
@@ -400,9 +404,8 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getMatches()
-                .then((results) => {
-                    this.insertBestRows(results)                    
-                    resolve();
+                .then((results) => {          
+                    resolve(results.slice(0, 10));
                 })
                 .catch((error) => {
                     reject(error);
@@ -421,8 +424,16 @@ class Database {
         
     }
 
-    getMatches(table_ids) {
-
+    getMatches() {
+        /* getMatches finds the rows that are most similar to the 
+         * current state of the seed set
+         * TODO: figure out the best way to implement similarity
+         * 
+         * Arguments:
+         * None
+         * 
+         * Returns:
+         * - Promise which resolves if query is successful, rejects otherwise.*/
         var results = [];
         var column = [];
         var stmt = null;
@@ -469,32 +480,12 @@ class Database {
     
                 this.all(stmt, [this.seedSet['numCols']], results);
 
-                console.log(results);
+                results = results.map(result => result['value'])
 
                 resolve(results)
             } catch (error) {
                 reject(error)
             }
-        })
-    }
-
-    insertBestRows(rows) {
-        return new Promise((resolve, reject) => {
-            try {
-                var row = { };
-
-                for (let i = 0; i < Math.min(rows.length, 10); i++) { // Best 10 rows
-                    row = rows[i]
-                    if (row['pSum'] === 0) continue // Exact match, don't want a repeated row
-                    this.seedSet['rows'].push(row['value'])
-                    this.seedSet['table_ids'].push(row['table_id'])
-                    this.seedSet['row_ids'].push(row['row_id'])
-                }
-                resolve()
-            } catch (error) {
-                reject(error)
-            }
-
         })
     }
 
@@ -527,13 +518,19 @@ class Database {
         })
     }
 
-    fillNulls() {
-    /* Pad each row with NULL until the table is a rectangle */
+    fillNulls(table) {
+        /* Pad each row with NULL until the table is a rectangle 
+         * 
+         * Arguments:
+         * - table: The table we want to pad with NULLs
+         * 
+         * Returns:
+         * - undefined, since we modify table in place*/
         var row;
-        for (let i = 0; i < this.seedSet['rows'].length; i++) {
-            row = this.seedSet['rows'][i].split(' || ')
+        for (let i = 0; i < table.length; i++) {
+            row = table[i].split(' || ')
             for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
-            this.seedSet['rows'][i] = row.join(' || ')
+            table[i] = row.join(' || ')
         }
     }
 

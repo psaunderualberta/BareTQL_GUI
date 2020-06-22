@@ -188,7 +188,7 @@ export default {
 
             if (data[0].length > 0) {
                 data.forEach(row => {
-                    row = row.split(' || ') // Hardcoded split, from getResults.js in 'handleResponse'
+                    row = row.split(' || ')
                     cellCount += row.length;
                     this.numCols = Math.max(this.numCols, row.length);
     
