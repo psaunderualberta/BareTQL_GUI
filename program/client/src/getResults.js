@@ -232,7 +232,7 @@ class ResultService {
         engine.defineConfig( { 
             fldWeights: { title: 1, rows: 1 },
             bm25Params: { k1: 1.2, b: 0.3, k: 0.75 }
-        } );
+        });
         engine.definePrepTasks( pipe );
         ResultService.addTablesToEngine(tables, engine)
 
@@ -260,17 +260,15 @@ class ResultService {
     }
 
     static addTablesToEngine(tables, engine) {
-        /* Organizes the tables into an array of the following form:
-         * [
-         *    "<table_id> - <string of rows, no separators>"
-         *     ...
-         * ]
+        /* Organizes each table into an object, with fields for the table_id, 
+         * title and the table rows.
          * 
          * Arguments: 
          * - tables: The tables object formatted with 'handleResponse()'
          * 
          * Returns:
-         * - array formatted to the above description
+         * - Array of objects, with each object representing a table
+         *      as formatted above
          */
         
          // TODO: Somehow include a bias for the location of the keywords

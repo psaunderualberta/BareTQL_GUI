@@ -30,7 +30,7 @@
                 </template>
             </Instruction>
             <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
-            <button v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
+            <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
                 Click to perform operation
             </button>
         </div>
@@ -71,7 +71,7 @@
                     </tr>
                     <tr>
                         <td v-for="col in numCols" :key="col">
-                            <p class="slider-values">{{ sliderValues[col - 1] }}%  Sticky</p>
+                            <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
                     </tr>
@@ -140,11 +140,22 @@ export default {
 
         executeDotOp() {
             /* Executes the dot op selected by user */
+            var changeButton = function(button, content) {
+                button.textContent = content;
+                button.disabled = !button.disabled;
+                button.classList.toggle('deactivate');
+            }
+
+            var submitButton = this.document.querySelector("#dot-op-submit")
+            changeButton(submitButton, "Loading Results...")
+            
             ResultService.handleDotOps(this.dotOp, this.sliderValues)
             .then((data) => {
+                changeButton(submitButton, "Click to perform operation")
                 this.handleResponse(data);
             })
             .catch((err) => {
+                changeButton(submitButton, "An error occurred. Please try again")
                 console.log(err);
             })
         },

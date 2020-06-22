@@ -74,7 +74,7 @@ input[type=checkbox]:checked + label {
 
 .page, .separate-components {
     padding: 1% 0;
-    height: auto;
+    margin-bottom: 1%;
 }
 
 /* Divide the webpage into two 'halves',

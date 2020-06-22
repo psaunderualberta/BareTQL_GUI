@@ -4,7 +4,7 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
 */ 
 const sqlite3 = require('better-sqlite3');
-const {similarity, distance} = require('talisman/metrics/jaro-winkler')
+const {similarity, distance, custom} = require('talisman/metrics/jaro-winkler')
 const dice = require('talisman/metrics/dice');
 const moment = require('moment');
 
@@ -34,8 +34,20 @@ class Database {
 
         console.log("Connected to database");
 
-        this.db.function('jaro', (str1, str2) => similarity(str1, str2)); // Take max to get largest number of results
-        this.db.function('dice', (str1, str2) => dice(str1, str2))
+        var jaroSim = function(str1, str2) {return similarity(str1, str2)}
+        var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
+
+        this.db.function('sameType', (cVal, ssVal) => Number(isNaN(cVal) === isNaN(ssVal)))
+
+        this.db.function('proximity', (cVal, ssVal) => {
+            if (!isNaN(ssVal))
+                return Math.abs(Number(cVal) - Number(ssVal)) /* ADD Function to restrict between 0, 1 */
+            else 
+                return Math.min(jaroSim(cVal, ssVal), diceSim(cVal, ssVal))
+        });
+
+        // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
+        // this.db.function('dice', (str1, str2) => dice(str1, str2))
 
         this.seedSet = {
             sliders: [],
@@ -152,6 +164,7 @@ class Database {
             rows: [],
             table_ids: tableIDs.join(', '),
             row_ids: rowIDs.join(', '),
+            numCols: 0,
         };
 
         /* Create 'table' based on values of tableIDs, rowIDs
@@ -181,12 +194,12 @@ class Database {
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
 
                 var row;
-                var numCols = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+                this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
                 
                 /* Pad each row with NULL until the table is a rectangle */
                 for (let i = 0; i < this.seedSet['rows'].length; i++) {
                     row = this.seedSet['rows'][i].split(' || ')
-                    for (let j = row.length; j < numCols; j++) row.push("NULL")
+                    for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
                     this.seedSet['rows'][i] = row.join(' || ')
                 }
 
@@ -378,22 +391,20 @@ class Database {
          * to the current table
          *
          * PSEUDO:
-         * 1. Find related tables to the current table
-         *      a) Give each table a 'related' score based on # 
-         *         of rows which match
-         *      b) Identify the row and column mapping from current table
-         * 2. Create new rows based on the column mapping for each table,
-         *      add the 'related' score to the score for each row
-         * 3. Sort the created rows based on the score.
-         * 4. Append the rows with the highest score to the seed set.
+         * 1. Iterate over each column, getting table_id, row_id of matches
+         *      a) Restrict / eliminate results by proximity to original values
+         *      b) Restrict results to slider percentage is upheld
+         * 2. Intersect all result sets.
+         * 3. Order by # of matches
+         * 4. Return specified # of matches.
          *
          */
 
         return new Promise((resolve, reject) => {
             try {
-                this.getRelatedTables()
+                this.getMatches()
                 .then((results) => {
-                    this.getRelatedRows(results)
+                    this.groupRows(results)
                 })
                 .then((results) => {
                     this.insertBestRows(results)                    
@@ -416,59 +427,96 @@ class Database {
         
     }
 
-    getRelatedTables() {
-        /* 'key' refers to primary key, LH column.
-         * 
-         * Get titles of the tables with rows
-         * currently in the seed set.
-         * 
-         * Find similar titles (HOW)
-         * Try:
-         *      - Dice
-         *      - Levenshtein
-         *      - Jaro-Winkler
-         * 
-         */ 
+    getMatches(table_ids) {
+
         var results = [];
-        var limit = 1.0;
-        var prom;
+        var column = [];
+        var stmt = null;
+        var customTable = [];
+        var cur;
+
+        var cells = this.seedSet['rows'].map(row => row.split(' || '))
+        console.log(cells)
 
         return new Promise((resolve, reject) => {
-            do {
-                const stmt = this.db.prepare(`
-                    WITH currentTitles AS (
-                        SELECT table_id, title
-                        FROM titles
-                        WHERE table_id in (${this.seedSet['table_ids']})
-                    )
-                    SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
-                    FROM titles t, currentTitles c
-                    WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
-                    AND 
-                    (
-                        (dice(c.title, t.title) >= ${limit})
-                    );
-                `)
-                prom = this.all(stmt, [], results)
-                limit -= 0.05;
-            } while ( new Set(results.map(result => result['title'])).size <= 1 ); // At least two unique tables in results
-            prom
-            .then(() => {
-                console.log(results, limit)
-                resolve(results);
-            })
-            .catch((error) => {
-                reject(error);
-            })
-        });
+            try {
+                for (let i = 0; i < this.seedSet['numCols']; i++) {
+                    column = [];
+                    customTable = [];
+
+                    for (let j = 0; j < this.seedSet['rows'].length; j++) {
+                        cur = cells[j][i]
+                        if (cur !== "NULL") {
+                            column.push(cur);
+                            customTable.push(`SELECT '${cur}' AS word, ${this.seedSet['sliders'][i]} AS proximity_limit`)
+                        }
+                    }
+        
+                    customTable = customTable.join(' UNION ALL ')
+        
+                    stmt = this.db.prepare(`
+                        SELECT c.table_id, c.row_id, c.col_id, c.value, proximity(c.value, o.word) AS p
+                        FROM cells c, (${customTable}) o
+                        WHERE c.col_id = ?
+                        AND ABS(LENGTH(c.value) - LENGTH(o.word)) <= o.proximity_limit
+                        AND sameType(c.value, o.word) = 1
+                        AND proximity(c.value, o.word) <= o.proximity_limit;
+                    `)
+        
+                    this.all(stmt, [i], results);
+
+                    customTable = []
+                }
+
+                resolve(results)
+            } catch (error) {
+                reject(error)
+            }
+        })
     }
 
-    getRelatedRows(table_ids) {
+    groupRows(results) {
 
+        
+        return new Promise((resolve, reject) => {
+            try {
+                var stmt;
+                var customTable = [];
+                for (let result of results) {
+                    customTable.push(`
+                    SELECT ${result['table_id']} AS table_id,
+                    ${result['row_id']} AS row_id,
+                    ${result['col_id']} AS col_id,
+                    '${result['value']}' AS value,
+                    ${result['p']} AS p
+                    `)
+                }
+
+                console.log(customTable[0])
+                
+                customTable = customTable.join(" UNION ALL ")
+                
+                stmt = this.db.prepare(`
+                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || '), SUM(p) AS pSum
+                    FROM (${customTable})
+                    GROUP BY table_id, row_id
+                    HAVING COUNT(DISTINCT col_id) = ?
+                    ORDER BY pSum ASC;
+                `)                
+        
+                var rows = [];
+                this.all(stmt, this.seedSet['numCols'], rows)
+        
+                console.log(rows[0])
+                resolve()
+            } catch (error) {
+                reject(error)
+            }
+        })
     }
 
-    insertBestRows(candidateRows) {
-
+    insertBestRows(rows) {
+        return
     }
 
     all(stmt, params = [], results) {
@@ -498,23 +546,6 @@ class Database {
                 rej(error)
             }
         })
-    }
-
-    makeTempTable(splitRow) {
-        /* Converts the row into a temporary table (combination of 'SELECT's and 'UNION ALL's)
-         * 
-         * Arguments:
-         * - splitRow: The row to make into a temporary table, represented as an array of cells
-         * 
-         * Returns:
-         * - customTable: a string representing a temporary table, with each row being a cell
-         * from 'splitRow' and the corresponding slider value
-         */
-        var customTable = [];
-        for (let i = 1; i < splitRow.length; i++) {
-            customTable.push(`SELECT '${splitRow[i]}' AS word, ${this.seedSet['sliders'][i]} AS edit_limit`)
-         }
-        return `(${customTable.join(' UNION ALL ')})`
     }
 
     makeStrArr(str) {
@@ -596,4 +627,56 @@ module.exports = Database;
         FROM titles
         WHERE lig('Olympic medalists in Biathlon', title) >= 0.5;
     `).all();
+*/
+
+/* 
+    UNUSED FUNCTIONS
+
+        getRelatedTables() {
+        /* 'key' refers to primary key, LH column.
+         * 
+         * Get titles of the tables with rows
+         * currently in the seed set.
+         * 
+         * Find similar titles (HOW)
+         * Try:
+         *      - Dice
+         *      - Levenshtein
+         *      - Jaro-Winkler
+         * 
+         // END COMMENT 
+        var results = [];
+        var limit = 1.0;
+        var prom;
+
+        return new Promise((resolve, reject) => {
+            do {
+                const stmt = this.db.prepare(`
+                    WITH currentTitles AS (
+                        SELECT table_id, title
+                        FROM titles
+                        WHERE table_id in (${this.seedSet['table_ids']})
+                    )
+                    SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
+                    FROM titles t, currentTitles c
+                    WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
+                    AND 
+                    (
+                        (dice(c.title, t.title) >= ${limit})
+                    );
+                `)
+                prom = this.all(stmt, [], results)
+                limit -= 0.05;
+            } while ( new Set(results.map(result => result['title'])).size <= 1 ); // At least two unique tables in results
+            prom
+            .then(() => {
+                console.log(results, limit)
+                resolve(results);
+            })
+            .catch((error) => {
+                reject(error);
+            })
+        });
+    }
+
 */
