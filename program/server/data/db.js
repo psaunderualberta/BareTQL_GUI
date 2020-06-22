@@ -350,40 +350,40 @@ class Database {
          */
         
         return new Promise((resolve, reject) => {
-            /* Only upon initialization of the dot-ops page */
-            if (dotOp === 'undefined' || dotOp === undefined) {
-                resolve(this.seedSet)
-            }
-
-            for (let i = 0; i < sliderValues.length; i++) {
-                this.seedSet['sliders'][i] = Number(sliderValues[i])
-            }
-            
-            /* Handle specific dot op */
-            new Promise((res, rej) => {
-                if (dotOp === 'xr') {
-                    this.xr()
-                    .then((results) => {
-                        res(results)
-                    })
-                } else if (dotOp === 'xc') {
-                    this.xc()
-                } else if (dotOp === 'fill') {
-                    this.fill()
-                } else {
-                    rej(`dotOp specified (${dotOp}) is not possible`)
+            try {
+                
+                for (let i = 0; i < sliderValues.length; i++) {
+                    this.seedSet['sliders'][i] = Number(sliderValues[i])
                 }
-            })
-            .then((results) => {
-                this.fillNulls(results)
-                var seedCopy = {...this.seedSet}
-                seedCopy['rows'] = results
-                resolve(seedCopy)
-            })
-            .catch((err) => {
-                console.log(err)
-                reject(err);
-            })
+                
+                /* Handle specific dot op */
+                new Promise((res, rej) => {
+                    /* Only upon initialization of the dot-ops page */
+                    if (dotOp === 'undefined') {
+                        res(this.seedSet['rows'])
+                        
+                    } else if (dotOp === 'xr') {
+                        this.xr()
+                        .then((results) => {
+                            res(results)
+                        })
+                    } else if (dotOp === 'xc') {
+                        this.xc()
+                    } else if (dotOp === 'fill') {
+                        this.fill()
+                    } else {
+                        rej(`dotOp specified (${dotOp}) is not possible`)
+                    }
+                })
+                .then((results) => {
+                    this.fillNulls(results)
+                    var seedCopy = {...this.seedSet}
+                    seedCopy['rows'] = results
+                    resolve(seedCopy)
+                })
+            } catch (error) {
+                reject(error)
+            }
         })
     }
 
