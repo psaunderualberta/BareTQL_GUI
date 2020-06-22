@@ -43,7 +43,7 @@ class Database {
             if (!isNaN(ssVal))
                 return Math.abs(Number(cVal) - Number(ssVal)) /* ADD Function to restrict between 0, 1 */
             else 
-                return Math.min(jaroSim(cVal, ssVal), diceSim(cVal, ssVal))
+                return jaroSim(cVal, ssVal)
         });
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
@@ -202,13 +202,12 @@ class Database {
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
 
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
-                    this.seedSet['sliders'].push(10);
+                    this.seedSet['sliders'].push(50);
                 }
 
                 resolve()
             })
             .catch((err) => {
-                console.log(err);
                 reject(err)
             })
         })
@@ -329,6 +328,8 @@ class Database {
                     }
                 }
 
+                this.seedSet['numCols'] -= cols.length;
+
                 resolve(this.seedSet);
             } catch (error) {
                 reject(error)
@@ -355,7 +356,7 @@ class Database {
             }
 
             for (let i = 0; i < sliderValues.length; i++) {
-                this.seedSet['sliders'][i] = Number(sliderValues[i]) / 5
+                this.seedSet['sliders'][i] = Number(sliderValues[i])
             }
             
             new Promise((res, rej) => {
@@ -437,7 +438,11 @@ class Database {
                         cur = cells[j][i]
                         if (cur !== "NULL") {
                             column.push(cur);
-                            customTable.push(`SELECT '${cur}' AS word, ${i} AS col_id, ${this.seedSet['sliders'][i]} AS proximity_limit`)
+                            customTable.push(`
+                                SELECT '${cur.replace(new RegExp(/'/, 'gi'), match => "'" + match)}' AS word, 
+                                ${i} AS col_id, 
+                                ${this.seedSet['sliders'][i]} AS proximity_limit
+                            `)
                         }
                     }
                 }
@@ -445,15 +450,17 @@ class Database {
                 customTable = customTable.join(' UNION ALL ')
     
                 stmt = this.db.prepare(`
-                SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value, SUM(p) AS pSum
+                SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value, SUM(p) AS pSum
                 FROM 
                 (
-                    SELECT c.table_id, c.row_id, c.col_id, c.value, proximity(c.value, o.word) AS p
+                    SELECT c.table_id, c.row_id, c.col_id, c.value, MIN(proximity(c.value, o.word)) AS p
                     FROM cells c, (${customTable}) o
                     WHERE c.col_id = o.col_id
                     AND ABS(LENGTH(c.value) - LENGTH(o.word)) <= o.proximity_limit
                     AND sameType(c.value, o.word) = 1
+                    AND 0 < proximity(c.value, o.word)
                     AND proximity(c.value, o.word) <= o.proximity_limit
+                    GROUP BY c.table_id, c.row_id, c.col_id, c.value
                 )
                 GROUP BY table_id, row_id
                 HAVING COUNT(DISTINCT col_id) = ?
@@ -462,7 +469,7 @@ class Database {
     
                 this.all(stmt, [this.seedSet['numCols']], results);
 
-                // console.log(results);
+                console.log(results);
 
                 resolve(results)
             } catch (error) {
@@ -476,8 +483,7 @@ class Database {
             try {
                 var row = { };
 
-                console.log(rows[0]);
-                for (let i = 0; i < rows.length; i++) {
+                for (let i = 0; i < Math.min(rows.length, 10); i++) { // Best 10 rows
                     row = rows[i]
                     if (row['pSum'] === 0) continue // Exact match, don't want a repeated row
                     this.seedSet['rows'].push(row['value'])

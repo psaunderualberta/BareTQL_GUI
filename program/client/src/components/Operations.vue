@@ -43,7 +43,6 @@
 
             <!-- Deletion buttons, Sliders -->
             <Instruction ref="instruction-3" index="3">
-
                 <template #hidden>
                     <p>
                         These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
@@ -53,7 +52,6 @@
                 </template>
             </Instruction>
             <Instruction ref="instruction-4" index="4">
-
                 <template #hidden>
                     <p>
                         You can also delete a column by clicking on the 'delete column' button above each one. <br> 
@@ -64,13 +62,10 @@
             <table>
                 <tbody>
                     <tr>
-                        <td style="border: none;" v-for="col in numCols" :key="col">
+                        <td v-for="col in numCols" :key="col">
                             <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
                             <label :for="'delete'+col">Delete Column</label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td v-for="col in numCols" :key="col">
+                            <hr style="width: 80">
                             <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
@@ -88,6 +83,11 @@
             </Instruction>
             <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
 
+        </div>
+        <div class="separate-components centering">
+            <h3 v-if="expandedRows !== null">Expanded Rows: {{ expandedRows.length }} rows found</h3>
+            <h3 v-else>Select an operation</h3>
+            <UserTable :table="expandedRows" :allowSelecton="false" />
         </div>
     </div>
 </template>
@@ -119,6 +119,7 @@ export default {
             dotOp: "",
             nullCount: 0,
             table: [],
+            expandedRows: null,
             deletions: [],
             sliderValues: [],
             document: document,
@@ -152,7 +153,7 @@ export default {
             ResultService.handleDotOps(this.dotOp, this.sliderValues)
             .then((data) => {
                 changeButton(submitButton, "Click to perform operation")
-                this.handleResponse(data);
+                this.expandedRows = this.handleResponse(data);
             })
             .catch((err) => {
                 changeButton(submitButton, "An error occurred. Please try again")
@@ -164,7 +165,7 @@ export default {
             /* Deletes all columns that the user has selected */
             ResultService.deleteCols(this.deletions)
             .then((data) => {
-                this.handleResponse(data)
+                this.table = this.handleResponse(data, true)
                 this.deletions = [];
             })
             .catch((err) => {
@@ -172,15 +173,15 @@ export default {
             })
         },
 
-        handleResponse(data) {
+        handleResponse(data, seedSet = false) {
             /* handles the response from the API when receiving a modified seed set */
             var cellCount = 0;
-            this.table = [];
+            var tmp = [];
             this.numCols = 0;
             this.sliderValues = []
 
             for (let i = 0; i < data['sliders'].length; i++) {
-                this.sliderValues.push(Number(data['sliders'][i]) * 5);
+                this.sliderValues.push(Number(data['sliders'][i]));
             }
 
             data = data['rows']
@@ -191,11 +192,13 @@ export default {
                     cellCount += row.length;
                     this.numCols = Math.max(this.numCols, row.length);
     
-                    this.table.push(row) 
+                    tmp.push(row) 
                 });
             }
 
-            this.nullCount = this.table.length * this.numCols - cellCount
+            if (seedSet) 
+                this.nullCount = tmp.length * this.numCols - cellCount
+            return tmp
         },
         changeOp(newOp) {
             /* Changes the operation, activated from ButtonList emission */
@@ -206,7 +209,7 @@ export default {
             /* Swaps the two cells selected by the user */
             ResultService.swapCells(indices)
             .then((data) => {
-                this.handleResponse(data);
+                this.table = this.handleResponse(data, true);
             })
             .catch((err) => {
                 console.log(err);
@@ -233,7 +236,7 @@ export default {
         /* Initial call to get the Seed Set from the API */
         ResultService.handleDotOps(undefined, this.sliderValues)
         .then((data) => {
-            this.handleResponse(data);
+            this.table = this.handleResponse(data, true);
         })
         .catch((err) => {
             console.log(err);
