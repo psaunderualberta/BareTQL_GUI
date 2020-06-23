@@ -45,6 +45,10 @@ body {
     font-family: "Roboto";
 }
 
+p {
+    margin: 0 0 1em 0
+}
+
 ul {
     list-style: none;
 }
@@ -61,7 +65,7 @@ input[type='submit'], button {
 
 
 input[type=checkbox] {
-    visibility: hidden;
+    display: none;
 }
 
 input[type=checkbox]:checked + label {

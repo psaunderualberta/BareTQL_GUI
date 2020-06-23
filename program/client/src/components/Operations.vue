@@ -14,26 +14,6 @@
      
             <button @click="goBack">Return to Keyword Search</button>
         </div>
-
-        <!--  -->
-        <div class="separate-components centering">
-            <Instruction ref="instruction-2" index="2">
-                <template #shown>
-                    <h4>Please select one of the operations below</h4>
-                </template>
-
-                <template #hidden>
-                    <p>
-                        These are the operations with which you can expand your seed set. <br>
-                        XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
-                    </p>
-                </template>
-            </Instruction>
-            <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
-            <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
-                Click to perform operation
-            </button>
-        </div>
         <div class="separate-components centering">
             <h3>Current Table: {{ table.length }} rows, {{ numCols }} columns, {{ nullCount }} null values</h3>
 
@@ -63,9 +43,10 @@
                 <tbody>
                     <tr>
                         <td v-for="col in numCols" :key="col">
-                            <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
-                            <label :for="'delete'+col">Delete Column</label>
-                            <hr style="width: 80">
+                            <div style="text-align: left;">
+                                <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
+                                <label :for="'delete'+col" style="padding: 1%">X</label>
+                            </div>
                             <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
@@ -83,10 +64,32 @@
             </Instruction>
             <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
 
+            <Instruction ref="instruction-2" index="2">
+                <template #hidden>
+                    <p>
+                        These are the operations with which you can expand your seed set. <br>
+                        XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
+                    </p>
+                </template>
+            </Instruction>
+            <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
+            <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
+                Confirm Selection
+            </button>
+
         </div>
+
+        <!-- User Operations
         <div class="separate-components centering">
+
+        </div> -->
+        
+        <!-- Result of Set Expansion -->
+        <div class="separate-components centering">
+            <h2>Result of Set Expansion</h2>
+            <hr style="width: 80%;">
             <h3 v-if="expandedRows !== null">Expanded Rows: {{ expandedRows.length }} rows found</h3>
-            <h3 v-else>Select an operation</h3>
+            <h4 v-else>No operation selected</h4>
             <UserTable :table="expandedRows" :allowSelecton="false" />
         </div>
     </div>

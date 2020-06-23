@@ -162,6 +162,7 @@ class Database {
         this.seedSet = {
             sliders: [],
             rows: [],
+            types: [],
             table_ids: tableIDs.map(id => id.trim()),
             row_ids: rowIDs.map(id => id.trim()),
             numCols: 0,
@@ -191,16 +192,20 @@ class Database {
                 this.seedSet['rows']
             )
             .then(() => {
+                /* 'unpack' results of query */
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-
-                var row;
                 this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
                 
                 this.fillNulls(this.seedSet['rows'])
+                this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
+                console.log(this.seedSet['types'])
 
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
-                if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  this.groupCols(this.seedSet['rows'])
+                if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  {
+                    this.groupCols(this.seedSet['rows'])
+                }
 
+                /* Set sliders to defaults */
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
                     this.seedSet['sliders'].push(50);
                 }
@@ -534,6 +539,36 @@ class Database {
         }
     }
 
+    getTypes(table) {
+        /* Gets the type of each column in 'table'. 
+         * If every cell is a number, it is labelled as 'number'
+         * Otherwise, it is of type 'text'
+         * 
+         * Assumes table has at least one row
+         * 
+         * Arguments:
+         * - table: The table for which column types will be found
+         * 
+         * Returns:
+         * - An array of dtypes */
+        var types = [];
+        var column = [];
+        var rows = table.map(row => row.split(' || '))
+
+        for (let i = 0; i < rows[0].length; i++) {
+            for (let j = 0; j < rows.length; j++) {
+                if (rows[j][i] !== "NULL")
+                    column.push(rows[j][i])
+            }       
+
+            column = column.map(value => isNaN(value));
+            if (column.indexOf(true) === -1) types.push("numerical")
+            else types.push("text");
+        }
+
+        return types
+    }
+
     makeStrArr(str) {
         /* Since the SQL arguments need to be an array, 
          * if the argument passed to a method is a string (i.e. only one keyword)
@@ -606,12 +641,27 @@ class Database {
 module.exports = Database;
 
 /*
-    TEST QUERIES: RUN IN TERMINAL   
+    TEST QUERIES: RUN IN TERMINAL
+
+    db.aggregate('toArr', {
+        start: () => [],
+        step: (array, nextValue) => {
+            array.push(nextValue);
+        },
+        result: array => JSON.stringify(array)
+    });
+
+    
+        db.prepare(`
+        SELECT table_id, toArr(row_id)
+        FROM cells
+        GROUP BY table_id
+    `).all();
 
     db.prepare(`
-        SELECT title
-        FROM titles
-        WHERE lig('Olympic medalists in Biathlon', title) >= 0.5;
+        SELECT table_id, getAverage(row_id)
+        FROM cells
+        GROUP BY table_id
     `).all();
 */
 
