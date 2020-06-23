@@ -35,8 +35,23 @@ class Database {
 
         console.log("Connected to database");
 
-        var jaroSim = function(str1, str2) {return similarity(str1, str2)}
-        var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
+        this.seedSet = {
+            sliders: [],
+            rows: [],
+            table_ids: '',
+            row_ids: '',
+        };
+
+        this.functions = {
+            xr: this.xr,
+            xc: this.xc,
+            fill: this.fill,
+        }
+
+        this.cellSep = ' || '
+
+        // var jaroSim = function(str1, str2) {return similarity(str1, str2)}
+        // var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
 
         /* Aggregate function to turn col into array 
          * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
@@ -57,26 +72,11 @@ class Database {
             arr1 = JSON.parse(arr1)
             arr2 = JSON.parse(arr2)
 
-            return Number(ttest(arr1, arr2, {alpha: alpha}).valid())
+            return Number(ttest(arr1, arr2, {alpha: 1 - alpha}).valid()) // We want low slider values to represent similar data => 1 - alpha
         })
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
         // this.db.function('dice', (str1, str2) => dice(str1, str2))
-
-        this.seedSet = {
-            sliders: [],
-            rows: [],
-            table_ids: '',
-            row_ids: '',
-        };
-
-        this.functions = {
-            xr: this.xr,
-            xc: this.xc,
-            fill: this.fill,
-        }
-
-        this.cellSep = ' || '
     } 
 
     keywordSearch(keywords, params = []) {
@@ -666,17 +666,13 @@ module.exports = Database;
     });
 
     
-        db.prepare(`
-        SELECT table_id, toArr(row_id)
-        FROM cells
-        GROUP BY table_id
-    `).all();
-
-    db.prepare(`
-        SELECT table_id, getAverage(row_id)
-        FROM cells
-        GROUP BY table_id
-    `).all();
+    
+    SELECT table_id, row_id, col_id, value
+    FROM cells c NATURAL JOIN types    
+    WHERE t.type = 'numerical  
+    AND c.location != 'header'
+    GROUP BY table_id, col_id
+    HAVING (something about T_TEST)
 */
 
 /* 
