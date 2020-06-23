@@ -7,6 +7,7 @@ const sqlite3 = require('better-sqlite3');
 const {similarity, distance, custom} = require('talisman/metrics/jaro-winkler')
 const dice = require('talisman/metrics/dice');
 const moment = require('moment');
+const ttest = require('ttest');
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -37,14 +38,27 @@ class Database {
         var jaroSim = function(str1, str2) {return similarity(str1, str2)}
         var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
 
-        this.db.function('sameType', (cVal, ssVal) => Number(isNaN(cVal) === isNaN(ssVal)))
-
-        this.db.function('proximity', (cVal, ssVal) => {
-            if (!isNaN(ssVal))
-                return Math.abs(Number(cVal) - Number(ssVal)) /* ADD Function to restrict between 0, 1 */
-            else 
-                return jaroSim(cVal, ssVal)
+        /* Aggregate function to turn col into array 
+         * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
+         * Accessed June 23rd, 2020 */
+        this.db.aggregate('toArr', {
+            start: () => [],
+            step: (array, nextValue) => {
+                array.push(nextValue);
+            },
+            result: array => JSON.stringify(array)
         });
+
+        /* We are using Welch's t-test to calculate the probability
+         * of two numerical columns being related
+         * https://en.wikipedia.org/wiki/Welch%27s_t-test
+         * Accessed June 23 2020 */
+        this.db.function('T_TEST', (arr1, arr2, alpha) => {
+            arr1 = JSON.parse(arr1)
+            arr2 = JSON.parse(arr2)
+
+            return Number(ttest(arr1, arr2, {alpha: alpha}).valid())
+        })
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
         // this.db.function('dice', (str1, str2) => dice(str1, str2))
@@ -714,5 +728,14 @@ module.exports = Database;
             })
         });
     }
+
+        this.db.function('sameType', (cVal, ssVal) => Number(isNaN(cVal) === isNaN(ssVal)))
+
+        this.db.function('proximity', (cVal, ssVal) => {
+            if (!isNaN(ssVal))
+                return Math.abs(Number(cVal) - Number(ssVal))
+            else 
+                return jaroSim(cVal, ssVal)
+        });
 
 */
