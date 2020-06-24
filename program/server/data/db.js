@@ -69,10 +69,26 @@ class Database {
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
         this.db.function('T_TEST', (arr1, arr2, alpha) => {
-            arr1 = JSON.parse(arr1)
-            arr2 = JSON.parse(arr2)
+            var p = null; 
+            
+            alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
+            
+            arr1 = JSON.parse(arr1).map(num => Number(num))
+            arr2 = JSON.parse(arr2).map(num => Number(num))
 
-            return Number(ttest(arr1, arr2, {alpha: 1 - alpha}).valid()) // We want low slider values to represent similar data => 1 - alpha
+            if (arr1.length === 0 || arr2.length === 0)
+                return 1 // Highest p-value possible => worst result
+
+            if (arr1.length === 1 && arr2.length === 1) 
+                p = 1 - Number(arr1[0] === arr2[0])
+                
+            /* If only one row in seedSet's numerical col, use one-sample t-test */
+            else if (arr1.length === 1)
+                p = Number(ttest(arr2, {mu: arr1[0], alpha: alpha}).pValue())
+            else 
+                p = Number(ttest(arr1, arr2, {alpha: alpha}).pValue())
+
+            return p 
         })
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
@@ -422,12 +438,12 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                this.getMatches()
+                this.getNumericalMatches()
                 .then((results) => {          
                     resolve(results.slice(0, 10));
                 })
                 .catch((error) => {
-                    reject(error);
+                    console.log(error);
                 })
             } catch (error) {
                 console.log(error);
@@ -443,7 +459,7 @@ class Database {
         
     }
 
-    getMatches() {
+    getNumericalMatches() {
         /* getMatches finds the rows that are most similar to the 
          * current state of the seed set
          * TODO: figure out the best way to implement similarity
@@ -453,59 +469,48 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        console.log(rows)
         var results = [];
         var column = [];
-        var stmt = null;
-        var customTable = [];
-        var cur;
-
-        var cells = this.seedSet['rows'].map(row => row.split(' || '))
+        var stmt;
 
         return new Promise((resolve, reject) => {
             try {
-                for (let i = 0; i < this.seedSet['numCols']; i++) {
-                    for (let j = 0; j < this.seedSet['rows'].length; j++) {
-                        cur = cells[j][i]
-                        if (cur !== "NULL") {
-                            column.push(cur);
-                            customTable.push(`
-                                SELECT '${cur.replace(new RegExp(/'/, 'gi'), match => "'" + match)}' AS word, 
-                                ${i} AS col_id, 
-                                ${this.seedSet['sliders'][i]} AS proximity_limit
-                            `)
-                        }
+                for (let i = 0; i < this.seedSet['types'].length; i++) {
+                    if (this.seedSet['types'][i] !== 'numerical')
+                        continue
+                    column = [];
+                    for (let j = 0; j < rows.length; j++) {
+                        if (rows[j][i] !== "NULL")
+                            column.push(rows[j][i])
                     }
+
+                    column = JSON.stringify(column)
+        
+                    stmt = this.db.prepare(`
+                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value), ?) AS pVal
+                        FROM cells c NATURAL JOIN columns col    
+                        WHERE col.type = 'numerical' 
+                        AND c.location != 'header'
+                        AND c.value != 'NULL'
+                        GROUP BY table_id, col_id
+                    `)
+
+        
+                    this.all(stmt, [column, this.seedSet['sliders'][i] / 100], results)
                 }
         
-                customTable = customTable.join(' UNION ALL ')
-    
-                stmt = this.db.prepare(`
-                SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value, SUM(p) AS pSum
-                FROM 
-                (
-                    SELECT c.table_id, c.row_id, c.col_id, c.value, MIN(proximity(c.value, o.word)) AS p
-                    FROM cells c, (${customTable}) o
-                    WHERE c.col_id = o.col_id
-                    AND ABS(LENGTH(c.value) - LENGTH(o.word)) <= o.proximity_limit
-                    AND sameType(c.value, o.word) = 1
-                    AND 0 < proximity(c.value, o.word)
-                    AND proximity(c.value, o.word) <= o.proximity_limit
-                    GROUP BY c.table_id, c.row_id, c.col_id, c.value
-                )
-                GROUP BY table_id, row_id
-                HAVING COUNT(DISTINCT col_id) = ?
-                ORDER BY pSum ASC;
-                `)
-    
-                this.all(stmt, [this.seedSet['numCols']], results);
-
-                results = results.map(result => result['value'])
-
-                resolve(results)
+                results.sort((r1, r2) => {return r1['pVal'] - r2['pVal']})
+        
+                // console.log(results);
+                
+                resolve(results);
             } catch (error) {
-                reject(error)
+                reject(error);
             }
         })
+
     }
 
     all(stmt, params = [], results) {
