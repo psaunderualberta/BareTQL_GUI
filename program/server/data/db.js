@@ -71,7 +71,7 @@ class Database {
         this.db.function('T_TEST', (arr1, arr2, alpha) => {
             var p = null; 
             
-            alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
+            // alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
             
             arr1 = JSON.parse(arr1).map(num => Number(num))
             arr2 = JSON.parse(arr2).map(num => Number(num))
@@ -80,7 +80,7 @@ class Database {
                 return 1 // Highest p-value possible => worst result
 
             if (arr1.length === 1 && arr2.length === 1) 
-                p = 1 - Number(arr1[0] === arr2[0])
+                p = Number(arr1[0] === arr2[0])
                 
             /* If only one row in seedSet's numerical col, use one-sample t-test */
             else if (arr1.length === 1)
@@ -440,6 +440,9 @@ class Database {
             try {
                 this.getNumericalMatches()
                 .then((results) => {          
+                    this.getTextualMatches(results);
+                })
+                .then((results) => {
                     resolve(results.slice(0, 10));
                 })
                 .catch((error) => {
@@ -460,9 +463,11 @@ class Database {
     }
 
     getNumericalMatches() {
-        /* getMatches finds the rows that are most similar to the 
-         * current state of the seed set
-         * TODO: figure out the best way to implement similarity
+        /* for every numerical column in the seed set, getNumericalMatches
+         * compares its distribution with the numerical columns in the database
+         * Using Welch's t-distribution test, or the one-sample test depending on 
+         * the length of the seed set. We then sort these columns based on their p-value,
+         * and organize them according to the seed set column they are being compared with
          * 
          * Arguments:
          * None
@@ -481,6 +486,7 @@ class Database {
                     if (this.seedSet['types'][i] !== 'numerical')
                         continue
                     column = [];
+                    results.push([])
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
                             column.push(rows[j][i])
@@ -493,23 +499,24 @@ class Database {
                         FROM cells c NATURAL JOIN columns col    
                         WHERE col.type = 'numerical' 
                         AND c.location != 'header'
-                        AND c.value != 'NULL'
+                        AND c.value != ''
                         GROUP BY table_id, col_id
                     `)
 
-        
-                    this.all(stmt, [column, this.seedSet['sliders'][i] / 100], results)
+                    this.all(stmt, [column, this.seedSet['sliders'][i] / 100], results[results.length - 1])
                 }
         
-                results.sort((r1, r2) => {return r1['pVal'] - r2['pVal']})
-        
-                // console.log(results);
-                
+                results.sort((r1, r2) => {return r2['pVal'] - r1['pVal']}) // Sort in descending order
+                        
                 resolve(results);
             } catch (error) {
                 reject(error);
             }
         })
+
+    }
+
+    getTextualMatches(results) {
 
     }
 
