@@ -33,13 +33,15 @@ class Database {
             return
         }
 
-        console.log("Connected to database");
+        console.log(`Connected to database at ${dbPath}`);
 
         this.seedSet = {
             sliders: [],
             rows: [],
+            types: [],
             table_ids: '',
             row_ids: '',
+            numCols: 0,
         };
 
         this.functions = {
@@ -68,7 +70,7 @@ class Database {
          * of two numerical columns being related
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
-        this.db.function('T_TEST', (arr1, arr2, alpha) => {
+        this.db.function('T_TEST', (arr1, arr2) => {
             var p = null; 
             
             // alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
@@ -84,9 +86,9 @@ class Database {
                 
             /* If only one row in seedSet's numerical col, use one-sample t-test */
             else if (arr1.length === 1)
-                p = Number(ttest(arr2, {mu: arr1[0], alpha: alpha}).pValue())
+                p = Number(ttest(arr2, {mu: arr1[0]}).pValue())
             else 
-                p = Number(ttest(arr1, arr2, {alpha: alpha}).pValue())
+                p = Number(ttest(arr1, arr2).pValue())
 
             return p 
         })
@@ -228,7 +230,7 @@ class Database {
                 
                 this.fillNulls(this.seedSet['rows'])
                 this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
-                console.log(this.seedSet['types'])
+                // console.log(this.seedSet['types'])
 
                 /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
                 if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  {
@@ -273,7 +275,6 @@ class Database {
             
             /* Split rows into arrays of cells */
             curRow = rows[i].split(' || ');
-            // console.log(curRow)
             
             /* I created this O(n) 'sorting' algorithm for 3 items w/ duplicates
             * when solving the leetcode problem 'sort colours': 
@@ -423,8 +424,8 @@ class Database {
     }
 
     xr() {
-        /* Append rows to table which are related
-         * to the current table
+        /* Delegates tasks related to the set expansion of
+         * seed set rows.
          *
          * PSEUDO:
          * 1. Iterate over each column, getting table_id, row_id of matches
@@ -442,9 +443,9 @@ class Database {
                 .then((results) => {          
                     this.getTextualMatches(results);
                 })
-                .then((results) => {
-                    resolve(results.slice(0, 10));
-                })
+                // .then((results) => {
+                //     resolve(results.slice(0, 10));
+                // })
                 .catch((error) => {
                     console.log(error);
                 })
@@ -467,7 +468,7 @@ class Database {
          * compares its distribution with the numerical columns in the database
          * Using Welch's t-distribution test, or the one-sample test depending on 
          * the length of the seed set. We then sort these columns based on their p-value,
-         * and organize them according to the seed set column they are being compared with
+         * and organize them according to the seed set column they are being compared
          * 
          * Arguments:
          * None
@@ -475,7 +476,6 @@ class Database {
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
-        console.log(rows)
         var results = [];
         var column = [];
         var stmt;
@@ -483,10 +483,10 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 for (let i = 0; i < this.seedSet['types'].length; i++) {
+                    results.push([])
                     if (this.seedSet['types'][i] !== 'numerical')
                         continue
                     column = [];
-                    results.push([])
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
                             column.push(rows[j][i])
@@ -495,19 +495,22 @@ class Database {
                     column = JSON.stringify(column)
         
                     stmt = this.db.prepare(`
-                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value), ?) AS pVal
+                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value)) AS pVal
                         FROM cells c NATURAL JOIN columns col    
                         WHERE col.type = 'numerical' 
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
+                        HAVING pVal > ?
                     `)
 
-                    this.all(stmt, [column, this.seedSet['sliders'][i] / 100], results[results.length - 1])
+                    this.all(stmt, [column, 1 - this.seedSet['sliders'][i] / 100], results[i])
                 }
-        
-                results.sort((r1, r2) => {return r2['pVal'] - r1['pVal']}) // Sort in descending order
-                        
+                
+                for (let i = 0; i < results.length; i++) {
+                    results[i].sort((r1, r2) => {return r2['pVal'] - r1['pVal']}) // Sort in descending order
+                }
+
                 resolve(results);
             } catch (error) {
                 reject(error);
@@ -517,6 +520,42 @@ class Database {
     }
 
     getTextualMatches(results) {
+        /* 
+         * 
+         * Arguments:
+         * - results: The results of getNumericalMatches
+         * 
+         * Returns:
+         * - Promise that resolves if querying is successful, rejects otherwise */
+
+         /* Intersection of two arrays
+          * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
+          * Accessed June 24th, 2020 */
+        var intersect = function(arr1, arr2) {
+            return arr1.filter(value => arr2.indexOf(value) !== -1)
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                var tables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
+                tables = tables.slice(1, ).reduce(intersect, tables[0]) // NOTE: this will be 'undefined' if results is empty
+        
+                console.log('common tables: ' + tables)
+                
+                /* No numerical columns */
+                if (tables === undefined) {
+                    
+                /* No textual columns */
+                } else if (results.every(result => result.length > 0)) {
+                    tables = `(${tables.join(', ')})`
+                } else {
+        
+                }
+                resolve()
+            } catch (error) {
+                reject(error)
+            }
+        })
 
     }
 

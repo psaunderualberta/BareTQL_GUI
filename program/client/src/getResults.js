@@ -12,9 +12,7 @@ var engine = bm25();
 const pipe = [
     nlp.string.lowerCase,
     nlp.string.tokenize0,
-    nlp.tokens.removeWords,
     nlp.tokens.stem,
-    nlp.tokens.propagateNegations
 ];
   
 engine.defineConfig( { fldWeights: { title: 2, rows: 1 } } );
@@ -226,11 +224,6 @@ class ResultService {
         }
 
         var engine = bm25();
-        const pipe = [
-            nlp.string.lowerCase,
-            nlp.string.tokenize0,
-            nlp.tokens.stem,
-        ];
         
         // Preparatory tasks
         engine.defineConfig( { 
