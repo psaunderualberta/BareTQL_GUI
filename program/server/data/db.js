@@ -97,7 +97,7 @@ class Database {
         this.db.function('SEM', (arr) => {
             arr = JSON.parse(arr).map(num => Number(num))
 
-            return statistics.standardDeviation(arr) / Math.sqrt(arr.length)
+            return statistics.standardDeviation(arr) / (Math.sqrt(arr.length) + 1e-5) // Avoid division by 0
         })
 
         this.db.function('isNumber', (num) => 1 - Number(isNaN(num)))
@@ -464,9 +464,9 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                // .then((results) => {          
-                //     this.getTextualMatches(results);
-                // })
+                .then((results) => {          
+                    this.getTextualMatches(results);
+                })
                 // .then((results) => {
                 //     resolve(results.slice(0, 10));
                 // })
@@ -500,6 +500,8 @@ class Database {
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
+        console.log(numNumerical)
         var results = [];
         var column = [];
         var stmt;
@@ -519,22 +521,34 @@ class Database {
                     column = JSON.stringify(column)
         
                     stmt = this.db.prepare(`
-                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) as sem
-                        FROM cells c NATURAL JOIN columns col    
-                        WHERE col.type = 'numerical' 
-                        AND c.location != 'header'
-                        AND c.value != ''
-                        GROUP BY table_id, col_id
-                        HAVING pVal > ?
-                        AND sem < ?;
+                        SELECT table_id, GROUP_CONCAT(col_id) AS cols
+                        FROM
+                        (
+                            SELECT table_id, col_id, toArr(value) AS value, 
+                                    T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) AS sem
+                            FROM cells c NATURAL JOIN columns col    
+                            WHERE c.table_id IN 
+                            (
+                                SELECT table_id
+                                FROM columns
+                                WHERE type = 'numerical'
+                                GROUP BY table_id
+                                HAVING COUNT(DISTINCT col_id) >= ?
+                            )
+                            AND col.type = 'numerical' 
+                            AND c.location != 'header'
+                            AND c.value != ''
+                            GROUP BY table_id, col_id
+                            HAVING pVal > ?
+                            AND sem < ?
+                            ORDER BY pVal DESC
+                        )
+                        GROUP BY table_id;
                     `)
 
-                    this.all(stmt, [column, 1 - this.seedSet['sliders'][i] / 100, this.seedSet['sliders'][i]], results[i])
-                }
-                
-                for (let i = 0; i < results.length; i++) {
-                    results[i].sort((r1, r2) => {return r2['pVal'] - r1['pVal']}) // Sort in descending order
-                    console.log(results[i].slice(0, 10));
+                    this.all(stmt, 
+                        [column, numNumerical, 1 - this.seedSet['sliders'][i] / 100, this.seedSet['sliders'][i] * 5], 
+                        results[i])
                 }
 
                 resolve(results);
@@ -557,6 +571,8 @@ class Database {
          /* Intersection of two arrays
           * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
           * Accessed June 24th, 2020 */
+
+        var stmt;
         var intersect = function(arr1, arr2) {
             return arr1.filter(value => arr2.indexOf(value) !== -1)
         }
@@ -569,11 +585,31 @@ class Database {
                 console.log('common tables: ' + tables)
                 
                 /* No numerical columns */
-                if (true) {// if (tables === undefined) {
+                if (tables === undefined) {
                     
-                /* No textual columns */
-                } else if (results.every(result => result.length > 0)) {
-                    
+                    /* No textual columns */
+                } else if (true) {// } else if (results.every(result => result.length > 0)) {
+                    results = results.map(result => result.filter(table => tables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
+                    console.log(results.map(res => res.length))
+                    var cols = [];
+                    for (const table of tables) {
+                        stmt = this.db.prepare(`
+                            SELECT table_id, toArr(value) AS column
+                            FROM cells c NATURAL JOIN columns col
+                            WHERE col.type = 'numerical'
+                            AND c.location != 'header'
+                            AND table_id = ?
+                            GROUP BY table_id, col_id
+                        `)
+
+                        this.all(stmt, [table], cols)
+                        cols = {
+                            table_id: table,
+                            cols: cols.map(res => JSON.parse(res['column']).map(num => Number(num)))
+                        }
+                        console.log(cols)
+                        break;
+                    }
 
                 } else {
         
@@ -603,7 +639,8 @@ class Database {
                 const rows = stmt.all(params)
                 rows.forEach((row) => {
                     // Set empty cells to be 'NULL'
-                    row['value'] = row['value'].split(' || ').map(cell => cell.length === 0 ? "NULL" : cell).join(' || ')
+                    if (typeof row['value'] !== 'undefined')
+                        row['value'] = row['value'].split(' || ').map(cell => cell.length === 0 ? "NULL" : cell).join(' || ')
 
                     results.push(row);
                 })
