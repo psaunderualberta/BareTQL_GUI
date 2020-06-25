@@ -6,9 +6,9 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 const sqlite3 = require('better-sqlite3');
 const {similarity, distance, custom} = require('talisman/metrics/jaro-winkler')
 const dice = require('talisman/metrics/dice');
-const moment = require('moment');
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
+const combinatorics = require('js-combinatorics')
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -72,26 +72,13 @@ class Database {
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
         this.db.function('T_TEST', (arr1, arr2) => {
-            var p = null; 
             
             // alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
             
             arr1 = JSON.parse(arr1).map(num => Number(num))
             arr2 = JSON.parse(arr2).map(num => Number(num))
-
-            if (arr1.length === 0 || arr2.length === 0)
-                return 1 // Highest p-value possible => worst result
-
-            if (arr1.length === 1 && arr2.length === 1) 
-                p = Number(arr1[0] === arr2[0])
-                
-            /* If only one row in seedSet's numerical col, use one-sample t-test */
-            else if (arr1.length === 1)
-                p = Number(ttest(arr2, {mu: arr1[0]}).pValue())
-            else 
-                p = Number(ttest(arr1, arr2).pValue())
-
-            return p 
+            
+            return this.ttestCases(arr1, arr2)
         })
 
         this.db.function('SEM', (arr) => {
@@ -573,6 +560,8 @@ class Database {
           * Accessed June 24th, 2020 */
 
         var stmt;
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var ssCols = [];
         var intersect = function(arr1, arr2) {
             return arr1.filter(value => arr2.indexOf(value) !== -1)
         }
@@ -590,11 +579,22 @@ class Database {
                     /* No textual columns */
                 } else if (true) {// } else if (results.every(result => result.length > 0)) {
                     results = results.map(result => result.filter(table => tables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
-                    console.log(results.map(res => res.length))
+                    // console.log(results.map(res => res.length))
+
+                    for (let i = 0; i < this.seedSet['types'].length; i++) {
+                        if (this.seedSet['types'][i] !== 'numerical')
+                            continue
+                        ssCols.push([])
+                        for (let j = 0; j < rows.length; j++) {
+                            if (rows[j][i] !== "NULL")
+                                ssCols[ssCols.length - 1].push(rows[j][i])
+                        }
+                    }
+
                     var cols = [];
                     for (const table of tables) {
                         stmt = this.db.prepare(`
-                            SELECT table_id, toArr(value) AS column
+                            SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
                             WHERE col.type = 'numerical'
                             AND c.location != 'header'
@@ -605,10 +605,29 @@ class Database {
                         this.all(stmt, [table], cols)
                         cols = {
                             table_id: table,
-                            cols: cols.map(res => JSON.parse(res['column']).map(num => Number(num)))
+                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num)))
                         }
-                        console.log(cols)
-                        break;
+
+                        var bestPerm = {
+                            perm: [],
+                            cumPVal: Infinity,
+                        };
+                        var curCumPVal = 0;
+
+                        /* Iterate over all permutations of the columns, 
+                         * finding the one that returns the lowest cumulative p-value */
+                        combinatorics.permutation(cols['columns']).toArray().forEach(perm => {
+                            curCumPVal = 0;
+                            ssCols.forEach((col, index) => {
+                                curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                            })
+                            if (curCumPVal < bestPerm['cumPVal']) {
+                                bestPerm['perm'] = perm;
+                                bestPerm['cumPVal'] = curCumPVal
+                            }
+                        })
+                        console.log(bestPerm)
+
                     }
 
                 } else {
@@ -700,6 +719,32 @@ class Database {
         console.log(types)
 
         return types
+    }
+
+    ttestCases(arr1, arr2) {
+        /* Handles the different cases of the t-test, 
+         * returning the p-value in each case 
+         * 
+         * Arguments:
+         * - arr1, arr2: the two arrays to use the t-test with
+         * 
+         * Returns:
+         * - p-value of the t-test */
+
+        var p = null; 
+        if (arr1.length === 0 || arr2.length === 0)
+            return 0 // Lowest p-value possible => worst result (want the best match)
+
+        if (arr1.length === 1 && arr2.length === 1) 
+            p = Number(arr1[0] === arr2[0])
+            
+        /* If only one row in seedSet's numerical col, use one-sample t-test */
+        else if (arr1.length === 1)
+            p = Number(ttest(arr2, {mu: arr1[0]}).pValue())
+        else 
+            p = Number(ttest(arr1, arr2).pValue())
+
+        return p 
     }
 
     makeStrArr(str) {
