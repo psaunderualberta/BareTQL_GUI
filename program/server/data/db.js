@@ -218,24 +218,12 @@ class Database {
         `)
 
         return new Promise((resolve, reject) => {
-            this.all(
-                stmt, 
-                [],
-                this.seedSet['rows']
-            )
+            this.all( stmt,  [], this.seedSet['rows'])
             .then(() => {
                 /* 'unpack' results of query */
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-                this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
                 
-                this.fillNulls(this.seedSet['rows'])
-                this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
-                // console.log(this.seedSet['types'])
-
-                /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
-                if (new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10)  {
-                    this.groupCols(this.seedSet['rows'])
-                }
+                this.cleanRows(grouping = true);
 
                 /* Set sliders to defaults */
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
@@ -248,6 +236,24 @@ class Database {
                 reject(err)
             })
         })
+    }
+
+    cleanRows(grouping = false) {
+        /* Performs the steps to clean the rows of the seed set,
+         * after numCols has been found
+         * 
+         * Returns: 
+         * - None, as it does the operations in-place */
+
+        this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+        this.fillNulls(this.seedSet['rows'])
+        
+        /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
+        if (grouping && ( new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10 ))  {
+            this.groupCols(this.seedSet['rows'])
+        }
+
+        this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
     }
 
     groupCols(rows) {
@@ -320,6 +326,8 @@ class Database {
 
                 this.seedSet['rows'] = rows.map(row => row.join(' || '))
 
+                this.cleanRows()
+
                 resolve(this.seedSet);
 
             } catch (err) {
@@ -364,7 +372,7 @@ class Database {
                     }
                 }
 
-                this.seedSet['numCols'] -= cols.length;
+                this.cleanRows()
 
                 resolve(this.seedSet);
             } catch (error) {
@@ -501,7 +509,7 @@ class Database {
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING pVal > ?
+                        HAVING pVal > ?;
                     `)
 
                     this.all(stmt, [column, 1 - this.seedSet['sliders'][i] / 100], results[i])
