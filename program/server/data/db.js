@@ -8,6 +8,7 @@ const {similarity, distance, custom} = require('talisman/metrics/jaro-winkler')
 const dice = require('talisman/metrics/dice');
 const moment = require('moment');
 const ttest = require('ttest');
+const statistics = require('simple-statistics')
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -92,6 +93,14 @@ class Database {
 
             return p 
         })
+
+        this.db.function('SEM', (arr) => {
+            arr = JSON.parse(arr).map(num => Number(num))
+
+            return statistics.standardDeviation(arr) / Math.sqrt(arr.length)
+        })
+
+        this.db.function('isNumber', (num) => 1 - Number(isNaN(num)))
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
         // this.db.function('dice', (str1, str2) => dice(str1, str2))
@@ -223,7 +232,7 @@ class Database {
                 /* 'unpack' results of query */
                 this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
                 
-                this.cleanRows(grouping = true);
+                this.cleanRows(true, true);
 
                 /* Set sliders to defaults */
                 for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
@@ -233,27 +242,34 @@ class Database {
                 resolve()
             })
             .catch((err) => {
+                console.log(err)
                 reject(err)
             })
         })
     }
 
-    cleanRows(grouping = false) {
+    cleanRows(changeSeed, grouping) {
         /* Performs the steps to clean the rows of the seed set,
-         * after numCols has been found
+         * including finding the number of cols, filling Null values, 
+         * grouping columns, and getting the types of the columns
          * 
          * Returns: 
          * - None, as it does the operations in-place */
 
-        this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+        if (changeSeed)
+            this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+
         this.fillNulls(this.seedSet['rows'])
         
         /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
-        if (grouping && ( new Set(tableIDs).size > 2 || this.seedSet['rows'].length > 10 ))  {
+        if (grouping && ( new Set(this.seedSet['table_ids']).size > 2 || this.seedSet['rows'].length > 10 )) {
             this.groupCols(this.seedSet['rows'])
         }
 
-        this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
+
+        if (changeSeed)
+            this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
+
     }
 
     groupCols(rows) {
@@ -326,7 +342,7 @@ class Database {
 
                 this.seedSet['rows'] = rows.map(row => row.join(' || '))
 
-                this.cleanRows()
+                this.cleanRows(true, false)
 
                 resolve(this.seedSet);
 
@@ -372,7 +388,7 @@ class Database {
                     }
                 }
 
-                this.cleanRows()
+                this.cleanRows(true, false)
 
                 resolve(this.seedSet);
             } catch (error) {
@@ -448,9 +464,9 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                .then((results) => {          
-                    this.getTextualMatches(results);
-                })
+                // .then((results) => {          
+                //     this.getTextualMatches(results);
+                // })
                 // .then((results) => {
                 //     resolve(results.slice(0, 10));
                 // })
@@ -503,20 +519,22 @@ class Database {
                     column = JSON.stringify(column)
         
                     stmt = this.db.prepare(`
-                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value)) AS pVal
+                        SELECT table_id, col_id, toArr(value) AS value, T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) as sem
                         FROM cells c NATURAL JOIN columns col    
                         WHERE col.type = 'numerical' 
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING pVal > ?;
+                        HAVING pVal > ?
+                        AND sem < ?;
                     `)
 
-                    this.all(stmt, [column, 1 - this.seedSet['sliders'][i] / 100], results[i])
+                    this.all(stmt, [column, 1 - this.seedSet['sliders'][i] / 100, this.seedSet['sliders'][i]], results[i])
                 }
                 
                 for (let i = 0; i < results.length; i++) {
                     results[i].sort((r1, r2) => {return r2['pVal'] - r1['pVal']}) // Sort in descending order
+                    console.log(results[i].slice(0, 10));
                 }
 
                 resolve(results);
@@ -551,11 +569,12 @@ class Database {
                 console.log('common tables: ' + tables)
                 
                 /* No numerical columns */
-                if (tables === undefined) {
+                if (true) {// if (tables === undefined) {
                     
                 /* No textual columns */
                 } else if (results.every(result => result.length > 0)) {
-                    tables = `(${tables.join(', ')})`
+                    
+
                 } else {
         
                 }
@@ -624,6 +643,8 @@ class Database {
          * 
          * Returns:
          * - An array of dtypes */
+        console.log('here')
+
         var types = [];
         var column = [];
         var rows = table.map(row => row.split(' || '))
@@ -638,6 +659,8 @@ class Database {
             if (column.indexOf(true) === -1) types.push("numerical")
             else types.push("text");
         }
+
+        console.log(types)
 
         return types
     }
