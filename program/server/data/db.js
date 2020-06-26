@@ -488,7 +488,6 @@ class Database {
          * - Promise which resolves if query is successful, rejects otherwise.*/
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
-        console.log(numNumerical)
         var results = [];
         var column = [];
         var stmt;
@@ -629,9 +628,11 @@ class Database {
                             
                             curCumPVal = 0;
                             
-                            // 1002 fails due to division by 0 (0 std in both arrays)
                             ssCols.forEach((col, index) => {
-                                curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
+                                    curCumPVal += 1 - Number(col[0] === perm[index][0])
+                                } else
+                                    curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
                             })
 
                             if (curCumPVal < bestPerm['cumPVal']) {
