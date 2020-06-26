@@ -486,10 +486,15 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
+        var intersect = function(arr1, arr2) {
+            return arr1.filter(value => arr2.indexOf(value) !== -1)
+        }
+
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var results = [];
         var column = [];
+        var ssCols = [];
         var stmt;
 
         return new Promise((resolve, reject) => {
@@ -537,6 +542,79 @@ class Database {
                         results[i])
                 }
 
+                var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
+                intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
+        
+                console.log('common tables: ' + intersectTables)
+
+                results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
+
+                for (let i = 0; i < this.seedSet['types'].length; i++) {
+                    if (this.seedSet['types'][i] !== 'numerical')
+                        continue
+                    ssCols.push([])
+                    for (let j = 0; j < rows.length; j++) {
+                        if (rows[j][i] !== "NULL")
+                            ssCols[ssCols.length - 1].push(rows[j][i])
+                    }
+                }
+
+                var cols = [];
+                var tables = [];
+
+                /* Get the best permutation for numerical columns for each table */
+                for (const table_id of intersectTables) {
+                    cols = [];
+                    stmt = this.db.prepare(`
+                        SELECT table_id, col_id, toArr(value) AS column
+                        FROM cells c NATURAL JOIN columns col
+                        WHERE col.type = 'numerical'
+                        AND c.location != 'header'
+                        AND table_id = ?
+                        GROUP BY table_id, col_id
+                    `)
+
+                    this.all(stmt, [table_id], cols)
+
+                    cols = {
+                        table_id: table_id,
+                        columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                        colIDs: cols.map(res => res['col_id'])
+                    }
+
+                    var bestPerm = {
+                        table_id: table_id,
+                        perm: [],
+                        cumPVal: Infinity,
+                    };
+                    var curCumPVal = 0;
+                    var idPerms = combinatorics.permutation(cols['colIDs'])
+                    var idPerm;
+
+                    /* Iterate over all permutations of the columns, 
+                     * finding the one that returns the lowest cumulative p-value */
+                    combinatorics.permutation(cols['columns']).forEach(perm => {
+                        idPerm = idPerms.next();
+                        
+                        curCumPVal = 0;
+                        
+                        ssCols.forEach((col, index) => {
+                            if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
+                                curCumPVal += 1 - Number(col[0] === perm[index][0])
+                            } else
+                                curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                        })
+
+                        if (curCumPVal < bestPerm['cumPVal']) {
+                            bestPerm['perm'] = idPerm;
+                            bestPerm['cumPVal'] = curCumPVal
+                        }
+                    })
+
+                    console.log(bestPerm)
+
+                }
+
                 resolve(results);
             } catch (error) {
                 reject(error);
@@ -557,93 +635,19 @@ class Database {
          /* Intersection of two arrays
           * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
           * Accessed June 24th, 2020 */
-
-        var stmt;
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
-        var ssCols = [];
-        var intersect = function(arr1, arr2) {
-            return arr1.filter(value => arr2.indexOf(value) !== -1)
-        }
+        var tables;
+
 
         return new Promise((resolve, reject) => {
             try {
-                var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
-                intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
-        
-                console.log('common tables: ' + intersectTables)
                 
                 /* No numerical columns */
-                if (intersectTables === undefined) {
+                if (tables === undefined) {
                     
                     /* No textual columns */
                 } else if (true) {// } else if (results.every(result => result.length > 0)) {
-                    results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
 
-                    for (let i = 0; i < this.seedSet['types'].length; i++) {
-                        if (this.seedSet['types'][i] !== 'numerical')
-                            continue
-                        ssCols.push([])
-                        for (let j = 0; j < rows.length; j++) {
-                            if (rows[j][i] !== "NULL")
-                                ssCols[ssCols.length - 1].push(rows[j][i])
-                        }
-                    }
-
-                    var cols = [];
-                    var tables = [];
-
-                    /* Get the best permutation for numerical columns for each table */
-                    for (const table_id of intersectTables) {
-                        cols = [];
-                        stmt = this.db.prepare(`
-                            SELECT table_id, col_id, toArr(value) AS column
-                            FROM cells c NATURAL JOIN columns col
-                            WHERE col.type = 'numerical'
-                            AND c.location != 'header'
-                            AND table_id = ?
-                            GROUP BY table_id, col_id
-                        `)
-
-                        this.all(stmt, [table_id], cols)
-
-                        cols = {
-                            table_id: table_id,
-                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                            colIDs: cols.map(res => res['col_id'])
-                        }
-
-                        var bestPerm = {
-                            table_id: table_id,
-                            perm: [],
-                            cumPVal: Infinity,
-                        };
-                        var curCumPVal = 0;
-                        var idPerms = combinatorics.permutation(cols['colIDs'])
-                        var idPerm;
-
-                        /* Iterate over all permutations of the columns, 
-                         * finding the one that returns the lowest cumulative p-value */
-                        combinatorics.permutation(cols['columns']).forEach(perm => {
-                            idPerm = idPerms.next();
-                            
-                            curCumPVal = 0;
-                            
-                            ssCols.forEach((col, index) => {
-                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
-                                    curCumPVal += 1 - Number(col[0] === perm[index][0])
-                                } else
-                                    curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
-                            })
-
-                            if (curCumPVal < bestPerm['cumPVal']) {
-                                bestPerm['perm'] = idPerm;
-                                bestPerm['cumPVal'] = curCumPVal
-                            }
-                        })
-
-                        console.log(bestPerm)
-
-                    }
 
                 } else {
         
