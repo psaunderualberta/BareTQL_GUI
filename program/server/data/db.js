@@ -701,7 +701,6 @@ class Database {
 
                         // Columns that are not in the column range of the seed set are ignored.
                         cases += `ELSE ${ignoredCols}`
-                        console.log(cases, table['textualPerm'], table['numericalPerm'], this.seedSet['types'])
                         
                         stmt = this.db.prepare(`
                         SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
@@ -718,9 +717,6 @@ class Database {
                         `)
                         
                         this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
-                        
-                        console.log(orderedRows);
-                        break;
 
                     }
 
@@ -734,9 +730,35 @@ class Database {
     }
 
     rankResults(results) {
+        /* Ranks the results that are gotten from getTextualMatches, 
+         * returns the 10 best
+         * 
+         * Arguments:
+         * - results: an array of rows from the tables that were identified to fit best with the data
+         * 
+         * Returns:
+         * - Promise which resolves if ranking is successful, rejects otherwise */
+        var sumSquaredDistance = 0;
+        var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
+
+        results = results.map(res => {value: JSON.parse(res['value']).map(cell => isNaN(cell) ? cell : Number(cell))})
+
         return new Promise((resolve, reject) => {
             try {
-                resolve([])
+                for (let result of results) {
+                    sumSquaredDistance = 0;
+                    for (let row of rows) {
+                        for (let i = 0; i < row.length; i++) {
+                            if (!isNaN(row[i]) && !isNaN(result[i]))
+                                sumSquaredDistance += Math.pow(row[i] - result[i], 2)
+                        }
+                    }
+                    result['dist'] = sumSquaredDistance / rows.length
+                }
+
+                result.sort((res1, res2) => {return res1['dist'] - res2['dist']})
+
+                resolve(results)
             } catch (error) {
                 reject()
             }
