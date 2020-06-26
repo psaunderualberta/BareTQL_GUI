@@ -545,22 +545,28 @@ class Database {
                 var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
         
-                console.log('common tables: ' + intersectTables)
-
+                
                 results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
-
+                
                 for (let i = 0; i < this.seedSet['types'].length; i++) {
                     if (this.seedSet['types'][i] !== 'numerical')
-                        continue
+                    continue
                     ssCols.push([])
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
-                            ssCols[ssCols.length - 1].push(rows[j][i])
+                        ssCols[ssCols.length - 1].push(rows[j][i])
                     }
                 }
-
+                
                 var cols = [];
                 var tables = [];
+                var bestPerm;
+                
+                if (typeof intersectTables === "undefined") {
+                    resolve([]) // No results for numerical columns
+                }
+
+                console.log('common tables: ' + intersectTables)
 
                 /* Get the best permutation for numerical columns for each table */
                 for (const table_id of intersectTables) {
@@ -611,11 +617,11 @@ class Database {
                         }
                     })
 
-                    console.log(bestPerm)
+                    tables.push(bestPerm)
 
                 }
 
-                resolve(results);
+                resolve(tables);
             } catch (error) {
                 reject(error);
             }
@@ -623,7 +629,7 @@ class Database {
 
     }
 
-    getTextualMatches(results) {
+    getTextualMatches(tables) {
         /* 
          * 
          * Arguments:
@@ -636,7 +642,6 @@ class Database {
           * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
           * Accessed June 24th, 2020 */
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
-        var tables;
 
 
         return new Promise((resolve, reject) => {
