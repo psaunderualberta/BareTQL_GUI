@@ -523,7 +523,7 @@ class Database {
                             (
                                 SELECT table_id
                                 FROM columns
-                                WHERE type LIKE '%numerical%'
+                                WHERE type = 'numerical' OR type LIKE 'numerical%'
                                 GROUP BY table_id
                                 HAVING COUNT(DISTINCT col_id) >= ?
                             )
@@ -573,7 +573,7 @@ class Database {
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
-                            WHERE col.type LIKE '%numerical%'
+                            WHERE (col.type = 'numerical' OR col.type LIKE 'numerical%')
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
@@ -603,7 +603,7 @@ class Database {
                             
                             curCumPVal = 0;
                             
-                            /* Emphasises 0s at the front, change */
+                            /* Emphasises 0s at the front, change (can be seen when querying first 2 rows of 'aircraft carriers')*/
                             ssCols.forEach((col, index) => {
                                 if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
                                     curCumPVal += 1 - Number(col[0] === perm[index][0])
@@ -663,7 +663,7 @@ class Database {
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
-                            WHERE col.type LIKE '%text%'
+                            WHERE (col.type = 'text' OR col.type LIKE 'text%')
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
@@ -751,7 +751,9 @@ class Database {
                                 sumSquaredDistance *= 2; // Want to remove as many nulls as possible
                         }
                     }
-                    result['dist'] = sumSquaredDistance / rows.length // Average distance across rows
+                    
+                     // Average distance across rows, SUBJECT TO CHANGE
+                    result['dist'] = sumSquaredDistance / rows.length
                 }
 
                 results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}).slice(0, 10);
