@@ -692,28 +692,32 @@ class Database {
 
                         for (let i = 0; i < this.seedSet['types'].length; i++) {
                             if (this.seedSet['types'][i] === 'text')
-                                cases += `WHEN ${table['textualPerm'][tP++]} THEN '${i}'\n`
+                                cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
                             else
-                                cases += `WHEN ${table['numericalPerm'][nP++]} THEN '${i}'\n`
+                                cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
                         }
 
+                        var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
+
+                        // Columns that are not in the column range of the seed set are ignored.
+                        cases += `ELSE ${ignoredCols}`
                         console.log(cases, table['textualPerm'], table['numericalPerm'], this.seedSet['types'])
                         
-
                         stmt = this.db.prepare(`
-                            SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
-                            FROM
-                            (
-                                SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
-                                FROM cells c
-                                WHERE table_id = ?
-                                AND c.location != 'header'
-                                ORDER BY row_id, col_order
-                            )
-                            GROUP BY table_id, row_id;
+                        SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                        FROM
+                        (
+                            SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                            FROM cells c
+                            WHERE table_id = ?
+                            AND c.location != 'header'
+                            ORDER BY table_id, row_id, col_order, value ASC
+                        )
+                        WHERE col_order != ?
+                        GROUP BY table_id, row_id;
                         `)
-
-                        this.all(stmt, [table['table_id']], orderedRows)
+                        
+                        this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
                         
                         console.log(orderedRows);
                         break;
@@ -732,7 +736,7 @@ class Database {
     rankResults(results) {
         return new Promise((resolve, reject) => {
             try {
-                resolve()
+                resolve([])
             } catch (error) {
                 reject()
             }
