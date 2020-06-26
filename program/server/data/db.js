@@ -454,9 +454,9 @@ class Database {
                 .then((results) => {          
                     this.getTextualMatches(results);
                 })
-                // .then((results) => {
-                //     resolve(results.slice(0, 10));
-                // })
+                .then((results) => {
+                    resolve(rankResults(results));
+                })
                 .catch((error) => {
                     console.log(error);
                 })
@@ -486,10 +486,7 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
-        var intersect = function(arr1, arr2) {
-            return arr1.filter(value => arr2.indexOf(value) !== -1)
-        }
-
+        
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var results = [];
@@ -497,6 +494,13 @@ class Database {
         var ssCols = [];
         var stmt;
 
+        /* Intersection of two arrays
+         * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
+         * Accessed June 24th, 2020 */
+        var intersect = function(arr1, arr2) {
+            return arr1.filter(value => arr2.indexOf(value) !== -1)
+        }
+        
         return new Promise((resolve, reject) => {
             try {
                 for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -590,7 +594,7 @@ class Database {
 
                     var bestPerm = {
                         table_id: table_id,
-                        perm: [],
+                        numericalPerm: [],
                         cumPVal: Infinity,
                     };
                     var curCumPVal = 0;
@@ -612,7 +616,7 @@ class Database {
                         })
 
                         if (curCumPVal < bestPerm['cumPVal']) {
-                            bestPerm['perm'] = idPerm;
+                            bestPerm['numericalPerm'] = idPerm;
                             bestPerm['cumPVal'] = curCumPVal
                         }
                     })
@@ -638,31 +642,60 @@ class Database {
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
 
-         /* Intersection of two arrays
-          * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
-          * Accessed June 24th, 2020 */
+        var cols;
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
 
 
         return new Promise((resolve, reject) => {
             try {
                 
                 /* No numerical columns */
-                if (tables === undefined) {
+                if (tables.length === 0) {
                     
                     /* No textual columns */
-                } else if (true) {// } else if (results.every(result => result.length > 0)) {
+                } else  {
+                    var table_ids = tables.map(table => table['table'])
 
+                                    /* Get the best permutation for numerical columns for each table */
+                    for (const table_id of table_ids) {
+                        cols = [];
+                        stmt = this.db.prepare(`
+                            SELECT table_id, col_id, toArr(value) AS column
+                            FROM cells c NATURAL JOIN columns col
+                            WHERE col.type = 'text'
+                            AND c.location != 'header'
+                            AND table_id = ?
+                            GROUP BY table_id, col_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
+                        `)
 
-                } else {
-        
-                }
+                        this.all(stmt, [table_id, numTextual], cols)
+
+                        cols = {
+                            table_id: table_id,
+                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                            colIDs: cols.map(res => res['col_id'])
+                        }
+
+                    }
                 resolve()
+                }
             } catch (error) {
                 reject(error)
             }
         })
 
+    }
+
+    rankResults(results) {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve()
+            } catch (error) {
+                reject()
+            }
+        })
     }
 
     all(stmt, params = [], results) {
