@@ -438,13 +438,9 @@ class Database {
         /* Delegates tasks related to the set expansion of
          * seed set rows.
          *
-         * PSEUDO:
-         * 1. Iterate over each column, getting table_id, row_id of matches
-         *      a) Restrict / eliminate results by proximity to original values
-         *      b) Restrict results to slider percentage is upheld
-         * 2. Intersect all result sets.
-         * 3. Order by # of matches
-         * 4. Return specified # of matches.
+         * Returns:
+         * - Promise which resolves if successfully completed search,
+         *      rejects otherwise
          *
          */
 
@@ -452,16 +448,17 @@ class Database {
             try {
                 this.getNumericalMatches()
                 .then((results) => {          
-                    this.getTextualMatches(results);
-                })
-                .then((results) => {
-                    resolve(this.rankResults(results));
+                    this.getTextualMatches(results)
+                    .then((results) => {
+                        resolve(this.rankResults(results));
+                    })
                 })
                 .catch((error) => {
                     console.log(error);
                 })
             } catch (error) {
                 console.log(error);
+                reject(error);
             }
         })
     }
@@ -526,7 +523,7 @@ class Database {
                             (
                                 SELECT table_id
                                 FROM columns
-                                WHERE type = 'numerical'
+                                WHERE type LIKE '%numerical%'
                                 GROUP BY table_id
                                 HAVING COUNT(DISTINCT col_id) >= ?
                             )
@@ -542,7 +539,7 @@ class Database {
                     `)
 
                     this.all(stmt, 
-                        [column, numNumerical, 1 - this.seedSet['sliders'][i] / 100, this.seedSet['sliders'][i] * 5], 
+                        [column, numNumerical, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i] * 5], 
                         results[i])
                 }
 
@@ -568,61 +565,60 @@ class Database {
                 
                 if (typeof intersectTables === "undefined") {
                     resolve([]) // No results for numerical columns
-                }
+                } else {
 
-                console.log('common tables: ' + intersectTables)
-
-                /* Get the best permutation for numerical columns for each table */
-                for (const table_id of intersectTables) {
-                    cols = [];
-                    stmt = this.db.prepare(`
-                        SELECT table_id, col_id, toArr(value) AS column
-                        FROM cells c NATURAL JOIN columns col
-                        WHERE col.type = 'numerical'
-                        AND c.location != 'header'
-                        AND table_id = ?
-                        GROUP BY table_id, col_id
-                    `)
-
-                    this.all(stmt, [table_id], cols)
-
-                    cols = {
-                        table_id: table_id,
-                        columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                        colIDs: cols.map(res => res['col_id'])
-                    }
-
-                    var bestPerm = {
-                        table_id: table_id,
-                        numericalPerm: [],
-                        cumPVal: Infinity,
-                    };
-                    var curCumPVal = 0;
-                    var idPerms = combinatorics.permutation(cols['colIDs'])
-                    var idPerm;
-
-                    /* Iterate over all permutations of the columns, 
-                     * finding the one that returns the lowest cumulative p-value */
-                    combinatorics.permutation(cols['columns']).forEach(perm => {
-                        idPerm = idPerms.next();
-                        
-                        curCumPVal = 0;
-                        
-                        ssCols.forEach((col, index) => {
-                            if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
-                                curCumPVal += 1 - Number(col[0] === perm[index][0])
-                            } else
-                                curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
-                        })
-
-                        if (curCumPVal < bestPerm['cumPVal']) {
-                            bestPerm['numericalPerm'] = idPerm;
-                            bestPerm['cumPVal'] = curCumPVal
+                    /* Get the best permutation for numerical columns for each table */
+                    for (const table_id of intersectTables) {
+                        cols = [];
+                        stmt = this.db.prepare(`
+                            SELECT table_id, col_id, toArr(value) AS column
+                            FROM cells c NATURAL JOIN columns col
+                            WHERE col.type LIKE '%numerical%'
+                            AND c.location != 'header'
+                            AND table_id = ?
+                            GROUP BY table_id, col_id
+                        `)
+    
+                        this.all(stmt, [table_id], cols)
+    
+                        cols = {
+                            table_id: table_id,
+                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                            colIDs: cols.map(res => res['col_id'])
                         }
-                    })
-
-                    tables.push(bestPerm)
-
+    
+                        var bestPerm = {
+                            table_id: table_id,
+                            numericalPerm: [],
+                            cumPVal: Infinity,
+                        };
+                        var curCumPVal = 0;
+                        var idPerms = combinatorics.permutation(cols['colIDs'])
+                        var idPerm;
+    
+                        /* Iterate over all permutations of the columns, 
+                         * finding the one that returns the lowest cumulative p-value */
+                        combinatorics.permutation(cols['columns']).forEach(perm => {
+                            idPerm = idPerms.next();
+                            
+                            curCumPVal = 0;
+                            
+                            /* Emphasises 0s at the front, change */
+                            ssCols.forEach((col, index) => {
+                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
+                                    curCumPVal += 1 - Number(col[0] === perm[index][0])
+                                } else
+                                    curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                            })
+    
+                            if (curCumPVal < bestPerm['cumPVal']) {
+                                bestPerm['numericalPerm'] = idPerm;
+                                bestPerm['cumPVal'] = curCumPVal
+                            }
+                        })
+    
+                        tables.push(bestPerm)
+                    }
                 }
 
                 resolve(tables);
@@ -667,7 +663,7 @@ class Database {
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
-                            WHERE col.type = 'text'
+                            WHERE col.type LIKE '%text%'
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
@@ -719,9 +715,8 @@ class Database {
                         this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
 
                     }
-
-                resolve(orderedRows)
                 }
+                resolve(orderedRows)
             } catch (error) {
                 reject(error)
             }
@@ -738,10 +733,11 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if ranking is successful, rejects otherwise */
+
         var sumSquaredDistance = 0;
         var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
 
-        results = results.map(res => {value: JSON.parse(res['value']).map(cell => isNaN(cell) ? cell : Number(cell))})
+        results = results.map(res => {return {value: res['value'].split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))}})
 
         return new Promise((resolve, reject) => {
             try {
@@ -749,18 +745,23 @@ class Database {
                     sumSquaredDistance = 0;
                     for (let row of rows) {
                         for (let i = 0; i < row.length; i++) {
-                            if (!isNaN(row[i]) && !isNaN(result[i]))
-                                sumSquaredDistance += Math.pow(row[i] - result[i], 2)
+                            if (!isNaN(row[i]) && !isNaN(result['value'][i]))
+                                sumSquaredDistance += Math.pow(row[i] - result['value'][i], 2)
+                            else
+                                sumSquaredDistance *= 2; // Want to remove as many nulls as possible
                         }
                     }
-                    result['dist'] = sumSquaredDistance / rows.length
+                    result['dist'] = sumSquaredDistance / rows.length // Average distance across rows
                 }
 
-                result.sort((res1, res2) => {return res1['dist'] - res2['dist']})
+                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}).slice(0, 10);
+
+                results = results.map(res => res['value'].join(' || '))
 
                 resolve(results)
             } catch (error) {
-                reject()
+                console.log(error)
+                reject(error)
             }
         })
     }
@@ -838,8 +839,6 @@ class Database {
             if (column.indexOf(true) === -1) types.push("numerical")
             else types.push("text");
         }
-
-        console.log(types)
 
         return types
     }

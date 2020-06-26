@@ -190,7 +190,7 @@ export default {
 
             data = data['rows']
 
-            if (data[0].length > 0) {
+            if (data.length > 0 && data[0].length > 0) {
                 data.forEach(row => {
                     row = row.split(' || ')
                     cellCount += row.length;
