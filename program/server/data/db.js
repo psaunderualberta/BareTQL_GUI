@@ -455,7 +455,7 @@ class Database {
                     this.getTextualMatches(results);
                 })
                 .then((results) => {
-                    resolve(rankResults(results));
+                    resolve(this.rankResults(results));
                 })
                 .catch((error) => {
                     console.log(error);
@@ -643,7 +643,10 @@ class Database {
          * - Promise that resolves if querying is successful, rejects otherwise */
 
         var cols;
+        var cases;
+        var stmt;
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var orderedRows = [];
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
 
 
@@ -655,10 +658,11 @@ class Database {
                     
                     /* No textual columns */
                 } else  {
-                    var table_ids = tables.map(table => table['table'])
+                    var nP = 0;
+                    var tP = 0;
 
-                                    /* Get the best permutation for numerical columns for each table */
-                    for (const table_id of table_ids) {
+                    /* Get the best permutation for textual columns for each table */
+                    for (let table of tables) {
                         cols = [];
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
@@ -670,16 +674,53 @@ class Database {
                             HAVING COUNT(DISTINCT col_id) >= ?
                         `)
 
-                        this.all(stmt, [table_id, numTextual], cols)
+                        this.all(stmt, [table['table_id'], numTextual], cols)
 
                         cols = {
-                            table_id: table_id,
+                            table_id: cols['table_id'],
                             columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
                             colIDs: cols.map(res => res['col_id'])
                         }
 
+                        // No rearranging for now.
+                        table['textualPerm'] = cols['colIDs']
+
+                        // Create custom CASE statement for col_id for ordering of output based on ideal permutations
+                        nP = 0;
+                        tP = 0;
+                        cases = "";
+
+                        for (let i = 0; i < this.seedSet['types'].length; i++) {
+                            if (this.seedSet['types'][i] === 'text')
+                                cases += `WHEN ${table['textualPerm'][tP++]} THEN '${i}'\n`
+                            else
+                                cases += `WHEN ${table['numericalPerm'][nP++]} THEN '${i}'\n`
+                        }
+
+                        console.log(cases, table['textualPerm'], table['numericalPerm'], this.seedSet['types'])
+                        
+
+                        stmt = this.db.prepare(`
+                            SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                            FROM
+                            (
+                                SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                                FROM cells c
+                                WHERE table_id = ?
+                                AND c.location != 'header'
+                                ORDER BY row_id, col_order
+                            )
+                            GROUP BY table_id, row_id;
+                        `)
+
+                        this.all(stmt, [table['table_id']], orderedRows)
+                        
+                        console.log(orderedRows);
+                        break;
+
                     }
-                resolve()
+
+                resolve(orderedRows)
                 }
             } catch (error) {
                 reject(error)
