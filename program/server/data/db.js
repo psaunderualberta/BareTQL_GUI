@@ -514,8 +514,7 @@ class Database {
                     column = JSON.stringify(column)
         
                     stmt = this.db.prepare(`
-                        SELECT table_id, col_id, toArr(value) AS value, 
-                                T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) AS sem
+                        SELECT DISTINCT table_id
                         FROM cells c NATURAL JOIN columns col    
                         WHERE c.table_id IN 
                         (
@@ -529,13 +528,12 @@ class Database {
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING pVal > ?
-                        AND sem < ?
-                        ORDER BY pVal DESC
+                        HAVING T_TEST(?, toArr(value)) > ?
+                        AND SEM(toArr(value)) < ?
                     `)
 
                     this.all(stmt, 
-                        [column, numNumerical, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i] * 5], 
+                        [numNumerical, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i] * 5], 
                         results[i])
                 }
 
@@ -571,14 +569,15 @@ class Database {
     
                         this.all(stmt, [table_id], cols)
     
+                        /* 'refine' result of query */
                         cols = {
                             table_id: table_id,
                             columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
                             colIDs: cols.map(res => res['col_id'])
                         }
     
+                        /* Re-initialize Dynamic programming array */
                         pValDP = []
-
                         for (let i = 0; i < numNumerical; i++) {
                             pValDP[i] = [];
                             for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
@@ -603,6 +602,8 @@ class Database {
                             
                             /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
                             ssCols.forEach((col, index) => {
+
+                                /* If haven't calculated matching, fill dp array */
                                 if (pValDP[index][idPerm[index]] < 0) {
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
                                         pValDP[index][idPerm[index]] = 1 - Number(col[0] === perm[index][0])
@@ -611,7 +612,6 @@ class Database {
                                 }
 
                                 curCumPVal += pValDP[index][idPerm[index]]
-
                             })
 
                             
@@ -713,13 +713,14 @@ class Database {
                             ORDER BY table_id, row_id, col_order, value ASC
                         )
                         WHERE col_order != ?
-                        GROUP BY table_id, row_id;
+                        GROUP BY table_id, row_id
                         `)
                         
                         this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
 
                     }
                 }
+
                 resolve(orderedRows)
             } catch (error) {
                 reject(error)
@@ -741,12 +742,11 @@ class Database {
         var sumSquaredDistance = 0;
         var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
 
-        results = results.map(res => {return {value: res['value'].split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))}})
-
         return new Promise((resolve, reject) => {
             try {
                 for (let result of results) {
                     sumSquaredDistance = 1;
+                    result['value'] = result['value'].split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
                     for (let row of rows) {
                         for (let i = 0; i < row.length; i++) {
                             if (!isNaN(row[i]) && !isNaN(result['value'][i]))
@@ -760,9 +760,11 @@ class Database {
                     result['dist'] = sumSquaredDistance / rows.length
                 }
 
-                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}).slice(0, 10);
+                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}).slice(0, 10); // Sort in ascending order
 
-                results = results.map(res => res['value'].join(' || '))
+                // console.log(results);
+
+                results = results.map(res => res['value'].join(' || '));
 
                 resolve(results)
             } catch (error) {
