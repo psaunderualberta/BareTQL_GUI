@@ -541,12 +541,17 @@ class Database {
 
                 var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
-                
-                // results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
-                
-                var cols = [];
+                                
                 var tables = [];
+                var cols = [];
+                var curCumPVal;
                 var bestPerm;
+                var idPerms;
+                var idPerm;
+                var pValDP = [];
+
+                for (let i = 0; i < numNumerical; i++) 
+                    pValDP.push([])
                 
                 if (typeof intersectTables === "undefined") {
                     resolve([]) // No results for numerical columns
@@ -572,30 +577,44 @@ class Database {
                             colIDs: cols.map(res => res['col_id'])
                         }
     
-                        var bestPerm = {
+                        pValDP = []
+
+                        for (let i = 0; i < numNumerical; i++) {
+                            pValDP[i] = [];
+                            for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                                pValDP[i].push(-1)
+                            }
+                        }
+
+                        bestPerm = {
                             table_id: table_id,
                             numericalPerm: [],
                             cumPVal: Infinity,
                         };
-                        var curCumPVal = 0;
-                        var idPerms = combinatorics.permutation(cols['colIDs'])
-                        var idPerm;
+
+                        curCumPVal = 0;
+                        idPerms = combinatorics.permutation(cols['colIDs'])
     
                         /* Iterate over all permutations of the columns, 
                          * finding the one that returns the lowest cumulative p-value */
                         combinatorics.permutation(cols['columns']).forEach(perm => {
                             idPerm = idPerms.next();
-                            
                             curCumPVal = 0;
                             
-                            /* Emphasises 0s at the front, change (can be seen when querying first 2 rows of 'aircraft carriers')*/
+                            /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
                             ssCols.forEach((col, index) => {
-                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0) {
-                                    curCumPVal += 1 - Number(col[0] === perm[index][0])
-                                } else
-                                    curCumPVal += 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                                if (pValDP[index][idPerm[index]] < 0) {
+                                    if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
+                                        pValDP[index][idPerm[index]] = 1 - Number(col[0] === perm[index][0])
+                                    else
+                                        pValDP[index][idPerm[index]] = 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                                }
+
+                                curCumPVal += pValDP[index][idPerm[index]]
+
                             })
-    
+
+                            
                             if (curCumPVal < bestPerm['cumPVal']) {
                                 bestPerm['numericalPerm'] = idPerm;
                                 bestPerm['cumPVal'] = curCumPVal
@@ -666,7 +685,7 @@ class Database {
                         // No rearranging for now.
                         table['textualPerm'] = cols['colIDs']
 
-                        // Create custom CASE statement for col_id for ordering of output based on ideal permutations
+                        // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
                         nP = 0;
                         tP = 0;
                         cases = "";
@@ -727,7 +746,7 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 for (let result of results) {
-                    sumSquaredDistance = 0;
+                    sumSquaredDistance = 1;
                     for (let row of rows) {
                         for (let i = 0; i < row.length; i++) {
                             if (!isNaN(row[i]) && !isNaN(result['value'][i]))
