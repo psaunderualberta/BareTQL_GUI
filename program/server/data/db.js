@@ -504,7 +504,8 @@ class Database {
                     results.push([])
                     if (this.seedSet['types'][i] !== 'numerical')
                         continue
-                    column = [];
+                    ssCols.push([])
+                    column = ssCols[ssCols.length - 1]
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
                             column.push(rows[j][i])
@@ -513,29 +514,24 @@ class Database {
                     column = JSON.stringify(column)
         
                     stmt = this.db.prepare(`
-                        SELECT table_id, GROUP_CONCAT(col_id) AS cols
-                        FROM
+                        SELECT table_id, col_id, toArr(value) AS value, 
+                                T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) AS sem
+                        FROM cells c NATURAL JOIN columns col    
+                        WHERE c.table_id IN 
                         (
-                            SELECT table_id, col_id, toArr(value) AS value, 
-                                    T_TEST(?, toArr(value)) AS pVal, SEM(toArr(value)) AS sem
-                            FROM cells c NATURAL JOIN columns col    
-                            WHERE c.table_id IN 
-                            (
-                                SELECT table_id
-                                FROM columns
-                                WHERE type = 'numerical' OR type LIKE 'numerical%'
-                                GROUP BY table_id
-                                HAVING COUNT(DISTINCT col_id) >= ?
-                            )
-                            AND col.type = 'numerical' 
-                            AND c.location != 'header'
-                            AND c.value != ''
-                            GROUP BY table_id, col_id
-                            HAVING pVal > ?
-                            AND sem < ?
-                            ORDER BY pVal DESC
+                            SELECT table_id
+                            FROM columns
+                            WHERE type = 'numerical'
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
                         )
-                        GROUP BY table_id;
+                        AND col.type = 'numerical' 
+                        AND c.location != 'header'
+                        AND c.value != ''
+                        GROUP BY table_id, col_id
+                        HAVING pVal > ?
+                        AND sem < ?
+                        ORDER BY pVal DESC
                     `)
 
                     this.all(stmt, 
@@ -545,19 +541,8 @@ class Database {
 
                 var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
-        
                 
-                results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
-                
-                for (let i = 0; i < this.seedSet['types'].length; i++) {
-                    if (this.seedSet['types'][i] !== 'numerical')
-                    continue
-                    ssCols.push([])
-                    for (let j = 0; j < rows.length; j++) {
-                        if (rows[j][i] !== "NULL")
-                        ssCols[ssCols.length - 1].push(rows[j][i])
-                    }
-                }
+                // results = results.map(result => result.filter(table => intersectTables.indexOf(table['table_id']) !== -1)) // Get tables that are in the intersection
                 
                 var cols = [];
                 var tables = [];
@@ -573,7 +558,7 @@ class Database {
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
-                            WHERE (col.type = 'numerical' OR col.type LIKE 'numerical%')
+                            WHERE col.type = 'numerical'
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
@@ -663,7 +648,7 @@ class Database {
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
-                            WHERE (col.type = 'text' OR col.type LIKE 'text%')
+                            WHERE col.type = 'text'
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
