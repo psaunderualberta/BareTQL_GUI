@@ -8,15 +8,11 @@ const dotOpURL = 'http://localhost:3000/api/results/dot-op/?dotOp='
 const deleteURL = 'http://localhost:3000/api/results/delete/?del='
 const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
 
-var engine = bm25();
 const pipe = [
     nlp.string.lowerCase,
     nlp.string.tokenize0,
     nlp.tokens.stem,
 ];
-  
-engine.defineConfig( { fldWeights: { title: 2, rows: 1 } } );
-engine.definePrepTasks( pipe );
 
 class ResultService {
     
@@ -203,7 +199,7 @@ class ResultService {
     static rankTables(tables, keywords) {
         /* This function ranks the tables returned by 
          * the keyword search based on the Okapi BM25 
-         * retrieval function, where D is a given table,
+         * retrieval function
          * https://en.wikipedia.org/wiki/Okapi_BM25
          * 
          * Arguments: 
@@ -223,23 +219,23 @@ class ResultService {
             return {}
         }
 
+        var rankedTables = [];
         var engine = bm25();
         
         // Preparatory tasks
         engine.defineConfig( { 
-            fldWeights: { title: 1, rows: 1 },
-            bm25Params: { k1: 1.2, b: 0.3, k: 0.75 }
+            fldWeights: {title: 1, rows: 1},
+            bm25Params: {k1: 1.2, b: 0.3, k: 0.75}
         });
-        engine.definePrepTasks( pipe );
+        engine.definePrepTasks(pipe);
         ResultService.addTablesToEngine(tables, engine)
 
         // Indexing
         engine.consolidate()
 
         // Searching
-        let results = engine.search( keywords, 20 )
+        let results = engine.search(keywords, 20)
 
-        var rankedTables = [];
         var id;
         var table;
 

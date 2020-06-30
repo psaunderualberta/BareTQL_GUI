@@ -395,6 +395,8 @@ class Database {
          * Returns:
          * - Promise: resolves with new rows of seed set, rejects with error.
          */
+
+        var seedCopy;
         
         return new Promise((resolve, reject) => {
             try {
@@ -424,7 +426,7 @@ class Database {
                 })
                 .then((results) => {
                     this.fillNulls(results)
-                    var seedCopy = {...this.seedSet}
+                    seedCopy = {...this.seedSet}
                     seedCopy['rows'] = results
                     resolve(seedCopy)
                 })
@@ -474,7 +476,7 @@ class Database {
     getNumericalMatches() {
         /* for every numerical column in the seed set, getNumericalMatches
          * compares its distribution with the numerical columns in the database
-         * Using Welch's t-distribution test, or the one-sample test depending on 
+         * using Welch's t-distribution test, or the one-sample test depending on 
          * the length of the seed set. We then sort these columns based on their p-value,
          * and organize them according to the seed set column they are being compared
          * 
@@ -529,20 +531,20 @@ class Database {
                         AND c.value != ''
                         GROUP BY table_id, col_id
                         HAVING T_TEST(?, toArr(value)) > ?
-                        AND SEM(toArr(value)) < ?
+                        AND SEM(toArr(value)) < ?;
                     `)
 
                     this.all(stmt, 
-                        [numNumerical, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i] * 5], 
+                        [numNumerical, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
                         results[i])
                 }
 
                 var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
-                                
+
                 var tables = [];
                 var cols = [];
-                var curCumPVal;
+                var curChiTestStat;
                 var bestPerm;
                 var idPerms;
                 var idPerm;
@@ -576,7 +578,7 @@ class Database {
                             colIDs: cols.map(res => res['col_id'])
                         }
     
-                        /* Re-initialize Dynamic programming array */
+                        /* Re-initialize dynamic programming array */
                         pValDP = []
                         for (let i = 0; i < numNumerical; i++) {
                             pValDP[i] = [];
@@ -588,36 +590,36 @@ class Database {
                         bestPerm = {
                             table_id: table_id,
                             numericalPerm: [],
-                            cumPVal: Infinity,
+                            chiTestStat: 0,
                         };
 
-                        curCumPVal = 0;
+                        curChiTestStat = 0;
                         idPerms = combinatorics.permutation(cols['colIDs'])
     
                         /* Iterate over all permutations of the columns, 
                          * finding the one that returns the lowest cumulative p-value */
                         combinatorics.permutation(cols['columns']).forEach(perm => {
                             idPerm = idPerms.next();
-                            curCumPVal = 0;
+                            curChiTestStat = 0;
                             
                             /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
                             ssCols.forEach((col, index) => {
-
                                 /* If haven't calculated matching, fill dp array */
                                 if (pValDP[index][idPerm[index]] < 0) {
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                        pValDP[index][idPerm[index]] = 1 - Number(col[0] === perm[index][0])
+                                        pValDP[index][idPerm[index]] = Number(col[0] === perm[index][0])
                                     else
-                                        pValDP[index][idPerm[index]] = 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                                        pValDP[index][idPerm[index]] = this.ttestCases(col, perm[index]) // Low p-values are bad
                                 }
 
-                                curCumPVal += pValDP[index][idPerm[index]]
+                                curChiTestStat += Math.log(pValDP[index][idPerm[index]])
                             })
-
                             
-                            if (curCumPVal < bestPerm['cumPVal']) {
+                            curChiTestStat *= -2;
+
+                            if (curChiTestStat > bestPerm['chiTestStat']) {
                                 bestPerm['numericalPerm'] = idPerm;
-                                bestPerm['cumPVal'] = curCumPVal
+                                bestPerm['chiTestStat'] = curChiTestStat
                             }
                         })
     
@@ -682,10 +684,11 @@ class Database {
                             colIDs: cols.map(res => res['col_id'])
                         }
 
-                        // No rearranging for now.
+                        // No rearranging columns for now.
                         table['textualPerm'] = cols['colIDs']
 
                         // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
+                        var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
                         nP = 0;
                         tP = 0;
                         cases = "";
@@ -696,8 +699,6 @@ class Database {
                             else
                                 cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
                         }
-
-                        var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
 
                         // Columns that are not in the column range of the seed set are ignored.
                         cases += `ELSE ${ignoredCols}`
@@ -760,11 +761,9 @@ class Database {
                     result['dist'] = sumSquaredDistance / rows.length
                 }
 
-                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}).slice(0, 10); // Sort in ascending order
-
-                // console.log(results);
-
-                results = results.map(res => res['value'].join(' || '));
+                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}); // Sort in ascending order
+                
+                results = results.slice(0, 10).map(res => res['value'].join(' || '));
 
                 resolve(results)
             } catch (error) {

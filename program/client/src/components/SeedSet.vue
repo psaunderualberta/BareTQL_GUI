@@ -52,7 +52,7 @@
                 <div class="centering">
                     <Instruction ref="instruction-3" index="3">
                         <template #shown>
-                            <h4>Results</h4>
+                            <h3>Results</h3>
                         </template>
                         
                         <template #hidden>
