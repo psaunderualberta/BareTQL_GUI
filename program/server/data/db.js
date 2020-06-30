@@ -488,6 +488,7 @@ class Database {
         
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
         var results = [];
         var column = [];
         var ssCols = [];
@@ -510,7 +511,7 @@ class Database {
                     column = ssCols[ssCols.length - 1]
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
-                            column.push(rows[j][i])
+                            column.push(Number(rows[j][i]))
                     }
 
                     column = JSON.stringify(column)
@@ -525,6 +526,14 @@ class Database {
                             WHERE type = 'numerical'
                             GROUP BY table_id
                             HAVING COUNT(DISTINCT col_id) >= ?
+
+                            INTERSECT 
+
+                            SELECT table_id
+                            FROM columns
+                            WHERE type = 'text'
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
                         )
                         AND col.type = 'numerical' 
                         AND c.location != 'header'
@@ -535,12 +544,12 @@ class Database {
                     `)
 
                     this.all(stmt, 
-                        [numNumerical, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
+                        [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
                         results[i])
                 }
 
-                var intersectTables = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
-                intersectTables = intersectTables.slice(1, ).reduce(intersect, intersectTables[0]) // NOTE: this will be 'undefined' if results is empty
+                var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
+                union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
                 var tables = [];
                 var cols = [];
@@ -553,12 +562,12 @@ class Database {
                 for (let i = 0; i < numNumerical; i++) 
                     pValDP.push([])
                 
-                if (typeof intersectTables === "undefined") {
+                if (typeof union === "undefined") {
                     resolve([]) // No results for numerical columns
                 } else {
 
                     /* Get the best permutation for numerical columns for each table */
-                    for (const table_id of intersectTables) {
+                    for (const table_id of union) {
                         cols = [];
                         stmt = this.db.prepare(`
                             SELECT table_id, col_id, toArr(value) AS column
@@ -607,9 +616,9 @@ class Database {
                                 /* If haven't calculated matching, fill dp array */
                                 if (pValDP[index][idPerm[index]] < 0) {
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                        pValDP[index][idPerm[index]] = Number(col[0] === perm[index][0])
+                                        pValDP[index][idPerm[index]] = 1 - Number(col[0] === perm[index][0])
                                     else
-                                        pValDP[index][idPerm[index]] = this.ttestCases(col, perm[index]) // Low p-values are bad
+                                        pValDP[index][idPerm[index]] = 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
                                 }
 
                                 curChiTestStat += Math.log(pValDP[index][idPerm[index]])
@@ -626,6 +635,8 @@ class Database {
                         tables.push(bestPerm)
                     }
                 }
+
+                console.log(tables);
 
                 resolve(tables);
             } catch (error) {
@@ -649,7 +660,6 @@ class Database {
         var stmt;
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var orderedRows = [];
-        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
 
 
         return new Promise((resolve, reject) => {
@@ -671,12 +681,14 @@ class Database {
                             FROM cells c NATURAL JOIN columns col
                             WHERE col.type = 'text'
                             AND c.location != 'header'
-                            AND table_id = ?
+                            AND c.table_id = ?
                             GROUP BY table_id, col_id
-                            HAVING COUNT(DISTINCT col_id) >= ?
                         `)
 
-                        this.all(stmt, [table['table_id'], numTextual], cols)
+                        this.all(stmt, [table['table_id']], cols)
+
+                        if (cols.length === 0)
+                            continue
 
                         cols = {
                             table_id: cols['table_id'],
