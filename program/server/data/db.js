@@ -134,8 +134,8 @@ class Database {
                 UNION
     
                 SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
-                FROM keywords_title_caption k, titles t, cells c
-                WHERE k.table_id = t.table_id AND t.table_id = c.table_id 
+                FROM (SELECT DISTINCT table_id, keyword FROM keywords_title_caption) k, titles t, cells c
+                WHERE k.table_id = t.table_id AND t.table_id = c.table_id
                 AND k.keyword IN ${keywordQMarks}
                 GROUP BY t.table_id, c.row_id
     
