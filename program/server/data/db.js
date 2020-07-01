@@ -134,9 +134,12 @@ class Database {
                 UNION
     
                 SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
-                FROM (SELECT DISTINCT table_id, keyword FROM keywords_title_caption) k, titles t, cells c
+                FROM (
+                    SELECT DISTINCT table_id 
+                    FROM keywords_title_caption 
+                    WHERE keyword IN ${keywordQMarks}
+                ) k, titles t, cells c
                 WHERE k.table_id = t.table_id AND t.table_id = c.table_id
-                AND k.keyword IN ${keywordQMarks}
                 GROUP BY t.table_id, c.row_id
     
                 ORDER BY t.table_id, c.row_id
@@ -543,6 +546,10 @@ class Database {
                         AND SEM(toArr(value)) < ?;
                     `)
 
+                    /* 
+                         
+                        
+                    */
                     this.all(stmt, 
                         [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
                         results[i])
@@ -615,12 +622,14 @@ class Database {
                             ssCols.forEach((col, index) => {
                                 /* If haven't calculated matching, fill dp array */
                                 if (pValDP[index][idPerm[index]] < 0) {
+                                     /* Map p-values between 0.1 and 1 to avoid log(0) */
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                        pValDP[index][idPerm[index]] = 1 - Number(col[0] === perm[index][0])
+                                    pValDP[index][idPerm[index]] = 0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1
                                     else
-                                        pValDP[index][idPerm[index]] = 1 - this.ttestCases(col, perm[index]) // Low p-values are bad
+                                        pValDP[index][idPerm[index]] = 0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1 // Low p-values are bad
                                 }
 
+                                
                                 curChiTestStat += Math.log(pValDP[index][idPerm[index]])
                             })
                             
@@ -635,8 +644,7 @@ class Database {
                         tables.push(bestPerm)
                     }
                 }
-
-                console.log(tables);
+                
 
                 resolve(tables);
             } catch (error) {
