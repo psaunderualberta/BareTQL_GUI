@@ -563,7 +563,7 @@ class Database {
 
     getNumericalPerms(results) {
         /* Get the best permutation for numerical columns for each table */
-
+        var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var tables = [];
         var cols = [];
         var curChiTestStat;
@@ -574,77 +574,82 @@ class Database {
 
         for (let i = 0; i < numNumerical; i++) 
             pValDP.push([])
-
-        for (const table_id of results) {
-            cols = [];
-            stmt = this.db.prepare(`
-                SELECT table_id, col_id, toArr(value) AS column
-                FROM cells c NATURAL JOIN columns col
-                WHERE col.type = 'numerical'
-                AND c.location != 'header'
-                AND table_id = ?
-                GROUP BY table_id, col_id
-            `)
-
-            this.all(stmt, [table_id], cols)
-
-            /* 'refine' result of query */
-            cols = {
-                table_id: table_id,
-                columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                colIDs: cols.map(res => res['col_id'])
-            }
-
-            /* Re-initialize dynamic programming array */
-            pValDP = []
-            for (let i = 0; i < numNumerical; i++) {
-                pValDP[i] = [];
-                for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
-                    pValDP[i].push(-1)
-                }
-            }
-
-            bestPerm = {
-                table_id: table_id,
-                numericalPerm: [],
-                chiTestStat: 0,
-            };
-
-            curChiTestStat = 0;
-            idPerms = combinatorics.permutation(cols['colIDs'])
-
-            /* Iterate over all permutations of the columns, 
-                * finding the one that returns the lowest cumulative p-value */
-            combinatorics.permutation(cols['columns']).forEach(perm => {
-                idPerm = idPerms.next();
-                curChiTestStat = 0;
-                
-                /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
-                ssCols.forEach((col, index) => {
-                    /* If haven't calculated matching, fill dp array */
-                    if (pValDP[index][idPerm[index]] < 0) {
-                            /* Map p-values between 0.1 and 1 to avoid log(0) */
-                        if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                        pValDP[index][idPerm[index]] = 0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1
-                        else
-                            pValDP[index][idPerm[index]] = 0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1 // Low p-values are bad
+        return new Promise((resolve, reject) => {
+            try {
+                for (const table_id of results) {
+                    cols = [];
+                    stmt = this.db.prepare(`
+                        SELECT table_id, col_id, toArr(value) AS column
+                        FROM cells c NATURAL JOIN columns col
+                        WHERE col.type = 'numerical'
+                        AND c.location != 'header'
+                        AND table_id = ?
+                        GROUP BY table_id, col_id
+                    `)
+        
+                    this.all(stmt, [table_id], cols)
+        
+                    /* 'refine' result of query */
+                    cols = {
+                        table_id: table_id,
+                        columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                        colIDs: cols.map(res => res['col_id'])
                     }
-
-                    
-                    curChiTestStat += Math.log(pValDP[index][idPerm[index]])
-                })
-                
-                curChiTestStat *= -2;
-
-                if (curChiTestStat > bestPerm['chiTestStat']) {
-                    bestPerm['numericalPerm'] = idPerm;
-                    bestPerm['chiTestStat'] = curChiTestStat
+        
+                    /* Re-initialize dynamic programming array */
+                    pValDP = []
+                    for (let i = 0; i < numNumerical; i++) {
+                        pValDP[i] = [];
+                        for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                            pValDP[i].push(-1)
+                        }
+                    }
+        
+                    bestPerm = {
+                        table_id: table_id,
+                        numericalPerm: [],
+                        chiTestStat: 0,
+                    };
+        
+                    curChiTestStat = 0;
+                    idPerms = combinatorics.permutation(cols['colIDs'])
+        
+                    /* Iterate over all permutations of the columns, 
+                        * finding the one that returns the lowest cumulative p-value */
+                    combinatorics.permutation(cols['columns']).forEach(perm => {
+                        idPerm = idPerms.next();
+                        curChiTestStat = 0;
+                        
+                        /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
+                        ssCols.forEach((col, index) => {
+                            /* If haven't calculated matching, fill dp array */
+                            if (pValDP[index][idPerm[index]] < 0) {
+                                    /* Map p-values between 0.1 and 1 to avoid log(0) */
+                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
+                                pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1)
+                                else
+                                    pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1) // Low p-values are bad
+                            }
+        
+                            curChiTestStat += pValDP[index][idPerm[index]]
+                        })
+                        
+                        curChiTestStat *= -2;
+        
+                        if (curChiTestStat > bestPerm['chiTestStat']) {
+                            bestPerm['numericalPerm'] = idPerm;
+                            bestPerm['chiTestStat'] = curChiTestStat
+                        }
+                    })
+        
+                    tables.push(bestPerm)
                 }
-            })
-            tables.push(bestPerm)
-        }
-
-        resolve(tables)
+        
+                resolve(tables)
+            } catch (error) {
+                reject(error)
+            }
+        })
     }
 
     getTextualMatches(tables) {
@@ -655,10 +660,11 @@ class Database {
          * 
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var results = [];
 
         return new Promise((resolve, reject) => {
             try {
-                
                 /* No numerical columns */
                 if (tables.length === 0) {
                     stmt = this.db.prepare(`
@@ -668,8 +674,14 @@ class Database {
                         GROUP BY table_id
                         HAVING COUNT(DISTINCT col_id) >= ?;
                     `)
+
+                    this.all(stmt, [numTextual], results)
+                    results = results.map(result => result['numericalPerm'] = [])
                 } else  {
+                    results = tables
                 }
+
+                resolve(results)
             } catch(error) {
                 reject(error)
             }
@@ -677,44 +689,101 @@ class Database {
     }
 
     getTextualPerms(results) {
+        /* Get the best permutation for numerical columns for each table */
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var tables = [];
+        var cols = [];
+        var curCumProbs;
+        var bestPerm;
+        var idPerms;
+        var idPerm;
+        var pValDP = [];
 
+        for (let i = 0; i < numTextual; i++) 
+            pValDP.push([])
+        return new Promise((resolve, reject) => {
+            try {
+                for (const result of results) {
+                    cols = [];
+                    stmt = this.db.prepare(`
+                        SELECT table_id, col_id, toArr(value) AS column
+                        FROM cells c NATURAL JOIN columns col
+                        WHERE col.type = 'text'
+                        AND c.location != 'header'
+                        AND table_id = ?
+                        GROUP BY table_id, col_id
+                    `)
+        
+                    this.all(stmt, [result['table_id']], cols)
+        
+                    /* 'refine' result of query */
+                    cols = {
+                        table_id: table_id,
+                        columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                        colIDs: cols.map(res => res['col_id'])
+                    }
+        
+                    /* Re-initialize dynamic programming array */
+                    pValDP = []
+                    for (let i = 0; i < numTextual; i++) {
+                        pValDP[i] = [];
+                        for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                            pValDP[i].push(-1)
+                        }
+                    }
+        
+                    result['textualPerm'] = []
+                    result['bestScore'] = 0;
+        
+                    idPerms = combinatorics.permutation(cols['colIDs'])
+        
+                    /* Iterate over all permutations of the columns, 
+                        * finding the one that returns the lowest cumulative p-value */
+                    combinatorics.permutation(cols['columns']).forEach(perm => {
+                        idPerm = idPerms.next();
+                        curCumProbs = 0;
+                        
+                        /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
+                        ssCols.forEach((col, index) => {
+                            /* If haven't calculated matching, fill dp array */
+                            if (pValDP[index][idPerm[index]] < 0) {
+                                    /* Map p-values between 0.1 and 1 to avoid log(0) */
+                                if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
+                                pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1)
+                                else
+                                    pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1) // Low p-values are bad
+                            }
+        
+                        })
+                                
+                        if (curCumProbs > bestPerm['chiTestStat']) {
+                            bestPerm['textualPerm'] = idPerm;
+                            bestPerm['chiTestStat'] = curCumProbs
+                        }
+                    })
+        
+                    tables.push(bestPerm)
+                }
+        
+                resolve(tables)
+            } catch (error) {
+                reject(error)
+            }
+        })
     }
 
-    getPermutedRows(results) {
+    getPermutedRows() {
         var cols;
-        var cases;
+        var cases;results
         var stmt;
         var orderedRows = [];
-        
+
         try {
             var nP = 0;
             var tP = 0;
 
             /* Get the best permutation for textual columns for each table */
-            for (let table of tables) {
-                cols = [];
-                stmt = this.db.prepare(`
-                    SELECT table_id, col_id, toArr(value) AS column
-                    FROM cells c NATURAL JOIN columns col
-                    WHERE col.type = 'text'
-                    AND c.location != 'header'
-                    AND c.table_id = ?
-                    GROUP BY table_id, col_id
-                `)
-
-                this.all(stmt, [table['table_id']], cols)
-
-                if (cols.length === 0)
-                    continue
-
-                cols = {
-                    table_id: cols['table_id'],
-                    columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                    colIDs: cols.map(res => res['col_id'])
-                }
-
-                // No rearranging columns for now.
-                table['textualPerm'] = cols['colIDs']
+            for (let table of results) {
 
                 // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
                 var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
@@ -733,17 +802,17 @@ class Database {
                 cases += `ELSE ${ignoredCols}`
                 
                 stmt = this.db.prepare(`
-                SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
-                FROM
-                (
-                    SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
-                    FROM cells c
-                    WHERE table_id = ?
-                    AND c.location != 'header'
-                    ORDER BY table_id, row_id, col_order, value ASC
-                )
-                WHERE col_order != ?
-                GROUP BY table_id, row_id
+                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                    FROM
+                    (
+                        SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                        FROM cells c
+                        WHERE table_id = ?
+                        AND c.location != 'header'
+                        ORDER BY table_id, row_id, col_order, value ASC
+                    )
+                    WHERE col_order != ?
+                    GROUP BY table_id, row_id
                 `)
                 
                 this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
