@@ -456,6 +456,8 @@ class Database {
                 .then((results) => {          
                     return this.getTextualMatches(results)
                 }).then((results) => {
+                    return this.getPermutedRows(results)
+                }).then((results) => {
                     resolve(this.rankResults(results));
                 })
                 .catch((error) => {
@@ -561,8 +563,7 @@ class Database {
                 if (typeof union === "undefined") {
                     resolve([]) // No results for numerical columns
                 } else {
-
-                    /* Get the best permutation for numerical columns for each table */
+                    /* Get the best permutation of numerical columns for each table */
                     for (const table_id of union) {
                         cols = [];
                         stmt = this.db.prepare(`
@@ -651,36 +652,8 @@ class Database {
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
-        var results = [];
-
-        return new Promise((resolve, reject) => {
-            try {
-                /* No numerical columns */
-                if (tables.length === 0) {
-                    stmt = this.db.prepare(`
-                        SELECT table_id
-                        FROM columns
-                        WHERE type = 'text'
-                        GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?;
-                    `)
-
-                    this.all(stmt, [numTextual], results)
-                    results = results.map(result => result['numericalPerm'] = [])
-                } else  {
-                    results = tables
-                }
-
-                resolve(results)
-            } catch(error) {
-                reject(error)
-            }
-        })
-    }
-
-    getTextualPerms(results) {
-        /* Get the best permutation for numerical columns for each table */
         var sliderIndices = [];
+        var results = [];
         var tables = [];
         var ssCols = [];
         var pValDP = [];
@@ -713,6 +686,22 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
+                /* No numerical columns */
+                if (tables.length === 0) {
+                    stmt = this.db.prepare(`
+                        SELECT table_id
+                        FROM columns
+                        WHERE type = 'text'
+                        GROUP BY table_id
+                        HAVING COUNT(DISTINCT col_id) >= ?;
+                    `)
+
+                    this.all(stmt, [numTextual], results)
+                    results = results.map(result => result['numericalPerm'] = [])
+                } else  {
+                    results = tables
+                }
+
                 for (const result of results) {
                     cols = [];
                     stmt = this.db.prepare(`
@@ -781,15 +770,15 @@ class Database {
                 }
         
                 resolve(tables)
-            } catch (error) {
+            } catch(error) {
                 reject(error)
             }
         })
     }
 
-    getPermutedRows() {
+    getPermutedRows(results) {
         var cols;
-        var cases;results
+        var cases;
         var stmt;
         var orderedRows = [];
 
