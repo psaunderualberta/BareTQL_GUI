@@ -453,7 +453,7 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                .then((results) => {          
+                .then((results) => {      
                     return this.getTextualMatches(results)
                 }).then((results) => {
                     return this.getPermutedRows(results)
@@ -462,6 +462,7 @@ class Database {
                 })
                 .catch((error) => {
                     console.log(error);
+                    resolve([])
                 })
             } catch (error) {
                 console.log(error);
@@ -634,7 +635,6 @@ class Database {
                         tables.push(bestPerm)
                     }
                 }
-                
 
                 resolve(tables);
             } catch (error) {
@@ -652,9 +652,8 @@ class Database {
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
-        var results = [];
-        var tables = [];
         var ssCols = [];
         var pValDP = [];
         var cols = [];
@@ -663,11 +662,12 @@ class Database {
         var idPerms;
         var column;
         var idPerm;
+        var stmt;
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
-            results.push([])
             if (this.seedSet['types'][i] !== 'text')
                 continue
+
             ssCols.push([])
             column = ssCols[ssCols.length - 1]
             for (let j = 0; j < rows.length; j++) {
@@ -677,8 +677,9 @@ class Database {
         }
 
         this.seedSet['types'].forEach((type, i) => {
-            if (type === 'text')
-                sliderIndices.push(i)
+            if (type === 'text') {
+                sliderIndices.push(this.seedSet['sliders'][i])
+            }
         })
 
         for (let i = 0; i < sliderIndices.length; i++) 
@@ -693,16 +694,18 @@ class Database {
                         FROM columns
                         WHERE type = 'text'
                         GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?;
+                        HAVING COUNT(DISTINCT col_id) >= ?
+                        LIMIT 10;
                     `)
 
-                    this.all(stmt, [numTextual], results)
-                    results = results.map(result => result['numericalPerm'] = [])
-                } else  {
-                    results = tables
+                    this.all(stmt, [numTextual], tables)
+
+                    for (let i = 0; i < tables.length; i++) 
+                        tables[i]['numericalPerm'] = [];
+
                 }
 
-                for (const result of results) {
+                tables.forEach(table =>  {
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -713,12 +716,12 @@ class Database {
                         GROUP BY table_id, col_id
                     `)
         
-                    this.all(stmt, [result['table_id']], cols)
+                    this.all(stmt, [table['table_id']], cols)
         
                     /* 'refine' result of query */
                     cols = {
-                        table_id: table_id,
-                        columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                        table_id: table['table_id'],
+                        columns: cols.map(res => JSON.parse(res['column'])),
                         colIDs: cols.map(res => res['col_id'])
                     }
         
@@ -731,8 +734,8 @@ class Database {
                         }
                     }
         
-                    result['textualPerm'] = []
-                    result['bestScore'] = 0;
+                    table['textualPerm'] = []
+                    table['bestScore'] = 0;
         
                     idPerms = combinatorics.permutation(cols['colIDs'])
         
@@ -746,28 +749,28 @@ class Database {
                         ssCols.forEach((col, index) => {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
-                                for (let i = 0; i < Math.min(col.length, perm[index].length); i++) {
+                                for (let i = 0; i < col.length; i++) {
                                     if (perm.indexOf(col[i]) === -1)
-                                        pValDP[index][idPerm[index]] += sliderIndices[index]
+                                        pValDP[index][idPerm[index]] = sliderIndices[index]
                                     else
-                                        pValDP[index][idPerm[index]] += 100 - sliderIndices[index]
-                                }
-                                
-                                pValDP[index][idPerm[index]] /= Math.min(col.length, perm[index].length)
+                                        pValDP[index][idPerm[index]] = 100 - sliderIndices[index]
+                                }                                
+                                pValDP[index][idPerm[index]] /= col.length
 
                             }
                             
                             curCumProbs += pValDP[index][idPerm[index]]
+
                         })
                                 
-                        if (curCumProbs > bestPerm['chiTestStat']) {
-                            bestPerm['textualPerm'] = idPerm;
-                            bestPerm['chiTestStat'] = curCumProbs
+                        if (curCumProbs > table['bestScore']) {
+                            table['textualPerm'] = idPerm;
+                            table['bestScore'] = curCumProbs
                         }
-                    })
-        
-                    tables.push(bestPerm)
-                }
+                    })        
+                })
+
+                console.log(tables);
         
                 resolve(tables)
             } catch(error) {
@@ -782,51 +785,53 @@ class Database {
         var stmt;
         var orderedRows = [];
 
-        try {
-            var nP = 0;
-            var tP = 0;
-
-            /* Get the best permutation for textual columns for each table */
-            for (let table of results) {
-
-                // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
-                var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
-                nP = 0;
-                tP = 0;
-                cases = "";
-
-                for (let i = 0; i < this.seedSet['types'].length; i++) {
-                    if (this.seedSet['types'][i] === 'text')
-                        cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
-                    else
-                        cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
+        return new Promise((resolve, reject) => {
+            try {
+                var nP = 0;
+                var tP = 0;
+    
+                /* Get the best permutation for textual columns for each table */
+                for (let table of results) {
+    
+                    // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
+                    var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
+                    nP = 0;
+                    tP = 0;
+                    cases = "";
+    
+                    for (let i = 0; i < this.seedSet['types'].length; i++) {
+                        if (this.seedSet['types'][i] === 'text')
+                            cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
+                        else
+                            cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
+                    }
+    
+                    // Columns that are not in the column range of the seed set are ignored.
+                    cases += `ELSE ${ignoredCols}`
+                    
+                    stmt = this.db.prepare(`
+                        SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                        FROM
+                        (
+                            SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                            FROM cells c
+                            WHERE table_id = ?
+                            AND c.location != 'header'
+                            ORDER BY table_id, row_id, col_order, value ASC
+                        )
+                        WHERE col_order != ?
+                        GROUP BY table_id, row_id
+                    `)
+                    
+                    this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
+    
                 }
-
-                // Columns that are not in the column range of the seed set are ignored.
-                cases += `ELSE ${ignoredCols}`
-                
-                stmt = this.db.prepare(`
-                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
-                    FROM
-                    (
-                        SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
-                        FROM cells c
-                        WHERE table_id = ?
-                        AND c.location != 'header'
-                        ORDER BY table_id, row_id, col_order, value ASC
-                    )
-                    WHERE col_order != ?
-                    GROUP BY table_id, row_id
-                `)
-                
-                this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
-
+    
+                resolve(orderedRows)
+            } catch (error) {
+                reject(error)
             }
-
-            resolve(orderedRows)
-        } catch (error) {
-            reject(error)
-        }
+        })
     }
 
     rankResults(results) {
