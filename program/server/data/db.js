@@ -615,13 +615,13 @@ class Database {
                                 if (pValDP[index][idPerm[index]] < 0) {
                                      /* Map p-values between 0.1 and 1 to avoid log(0) */
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                    pValDP[index][idPerm[index]] = 0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1
+                                        pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1)
                                     else
-                                        pValDP[index][idPerm[index]] = 0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1 // Low p-values are bad
+                                        pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1) // Low p-values are bad
                                 }
 
                                 
-                                curChiTestStat += Math.log(pValDP[index][idPerm[index]])
+                                curChiTestStat += pValDP[index][idPerm[index]]
                             })
                             
                             curChiTestStat *= -2;
@@ -644,7 +644,12 @@ class Database {
     }
 
     getTextualMatches(tables) {
-        /* 
+        /* Gets the texutal matches and permutes the columns for all
+         * textual seed set columns. If there is at least one numerical column in 
+         * the seed set, then we use the tables found in the 
+         * previous step (getNumericalMatches). Otherwise, we search through the database
+         * for all tables with # of textual columns >= # of textual columns in the seed set, and
+         * perform the same operations with those.
          * 
          * Arguments:
          * - results: The results of getNumericalMatches
@@ -658,7 +663,6 @@ class Database {
         var pValDP = [];
         var cols = [];
         var curCumProbs;
-        var bestPerm;
         var idPerms;
         var column;
         var idPerm;
@@ -779,11 +783,19 @@ class Database {
         })
     }
 
-    getPermutedRows(results) {
-        var cols;
+    getPermutedRows(tables) {
+        /* Retrieves the rows of the tables found in the previous step,
+         * permuted to the 'best' possible permutations found in 
+         * getNumericalMatches() and getTextualMatches()
+         * 
+         * Arguments:
+         * - tables: The results of getNumericalMatches & getTextualMatches
+         * 
+         * Returns:
+         * - Promise which resolves if querying is successful, Rejects otherwise
+         */
         var cases;
         var stmt;
-        var orderedRows = [];
 
         return new Promise((resolve, reject) => {
             try {
@@ -791,8 +803,10 @@ class Database {
                 var tP = 0;
     
                 /* Get the best permutation for textual columns for each table */
-                for (let table of results) {
-    
+                for (let table of tables) {
+                    table['rows'] = [];
+                    table['score'] = table['chiTestStat'] + table['bestScore']
+
                     // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
                     var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
                     nP = 0;
@@ -810,7 +824,7 @@ class Database {
                     cases += `ELSE ${ignoredCols}`
                     
                     stmt = this.db.prepare(`
-                        SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                        SELECT GROUP_CONCAT(value, ' || ') AS value
                         FROM
                         (
                             SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
@@ -823,18 +837,19 @@ class Database {
                         GROUP BY table_id, row_id
                     `)
                     
-                    this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
+                    this.all(stmt, [table['table_id'], ignoredCols], table['rows'])
     
+                    table['rows'] = table['rows'].map(res => {return res['value']})
                 }
     
-                resolve(orderedRows)
+                resolve(tables)
             } catch (error) {
                 reject(error)
             }
         })
     }
 
-    rankResults(results) {
+    rankResults(tables) {
         /* Ranks the results that are gotten from getTextualMatches, 
          * returns the 10 best
          * 
@@ -844,30 +859,36 @@ class Database {
          * Returns:
          * - Promise which resolves if ranking is successful, rejects otherwise */
 
-        var sumSquaredDistance = 0;
         var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
+        var results = [];
+        var score = 0;
 
         return new Promise((resolve, reject) => {
             try {
-                for (let result of results) {
-                    sumSquaredDistance = 1;
-                    result['value'] = result['value'].split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
-                    for (let row of rows) {
-                        for (let i = 0; i < row.length; i++) {
-                            if (!isNaN(row[i]) && !isNaN(result['value'][i]))
-                                sumSquaredDistance += Math.pow(row[i] - result['value'][i], 2)
-                            else
-                                sumSquaredDistance *= 2; // Want to remove as many nulls as possible
+                for (let table of tables) {
+                    for (let tableRow of table['rows']) {
+                        score = table['score'];
+                        tableRow = tableRow.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
+                        for (let row of rows) {
+                            for (let i = 0; i < row.length; i++) {
+                                if (!isNaN(row[i]) && !isNaN(tableRow[i]))
+                                    score += Math.pow(row[i] - tableRow[i], 2)
+                                else
+                                    score /= (row[i] === tableRow[i]) ? 2 : (1/2); // Want to remove as many nulls as possible
+                            }
                         }
+                        
+                         // Average distance across rows, SUBJECT TO CHANGE
+                        results.push({
+                            row: tableRow.join(' || '),
+                            score: score,
+                        })
                     }
-                    
-                     // Average distance across rows, SUBJECT TO CHANGE
-                    result['dist'] = sumSquaredDistance / rows.length
                 }
 
-                results = results.sort((res1, res2) => {return res1['dist'] - res2['dist']}); // Sort in ascending order
+                results = results.sort((res1, res2) => {return res1['score'] - res2['score']}); // Sort in ascending order
                 
-                results = results.slice(0, 10).map(res => res['value'].join(' || '));
+                results = results.slice(0, 10).map(res => {return res['row']})
 
                 resolve(results)
             } catch (error) {
