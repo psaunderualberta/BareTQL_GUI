@@ -72,9 +72,7 @@ class Database {
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
         this.db.function('T_TEST', (arr1, arr2) => {
-            
-            // alpha = 1 - alpha; // We want low slider values to represent similar data => 1 - alpha
-            
+                        
             arr1 = JSON.parse(arr1).map(num => Number(num))
             arr2 = JSON.parse(arr2).map(num => Number(num))
             
@@ -202,6 +200,9 @@ class Database {
         /* Create 'table' based on values of tableIDs, rowIDs
          * https://stackoverflow.com/questions/985295/can-you-define-literal-tables-in-sql
          * Accessed June 9th, 2020
+         * 
+         * This breaks if we have more than 500 rows in the seed set, but if a user is selecting 500
+         * rows then that's their problem.
          */
         for (let i = 0; i < rowIDs.length; i++) {
             customTable.push(`SELECT ${tableIDs[i].trim()} AS table_id, ${rowIDs[i].trim()} AS row_id`)
@@ -452,11 +453,12 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                .then((results) => {          
-                    this.getTextualMatches(results)
-                    .then((results) => {
-                        resolve(this.rankResults(results));
-                    })
+                .then((results) => {
+                    return this.getNumericalPerms(results)
+                }).then((results) => {          
+                    return this.getTextualMatches(results)
+                }).then((results) => {
+                    resolve(this.rankResults(results));
                 })
                 .catch((error) => {
                     console.log(error);
@@ -496,13 +498,6 @@ class Database {
         var column = [];
         var ssCols = [];
         var stmt;
-
-        /* Intersection of two arrays
-         * https://stackoverflow.com/questions/1885557/simplest-code-for-array-intersection-in-javascript#1885569
-         * Accessed June 24th, 2020 */
-        var intersect = function(arr1, arr2) {
-            return arr1.filter(value => arr2.indexOf(value) !== -1)
-        }
         
         return new Promise((resolve, reject) => {
             try {
@@ -546,10 +541,6 @@ class Database {
                         AND SEM(toArr(value)) < ?;
                     `)
 
-                    /* 
-                         
-                        
-                    */
                     this.all(stmt, 
                         [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
                         results[i])
@@ -558,100 +549,98 @@ class Database {
                 var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
-                var tables = [];
-                var cols = [];
-                var curChiTestStat;
-                var bestPerm;
-                var idPerms;
-                var idPerm;
-                var pValDP = [];
-
-                for (let i = 0; i < numNumerical; i++) 
-                    pValDP.push([])
+                resolve(union)
                 
-                if (typeof union === "undefined") {
-                    resolve([]) // No results for numerical columns
-                } else {
-
-                    /* Get the best permutation for numerical columns for each table */
-                    for (const table_id of union) {
-                        cols = [];
-                        stmt = this.db.prepare(`
-                            SELECT table_id, col_id, toArr(value) AS column
-                            FROM cells c NATURAL JOIN columns col
-                            WHERE col.type = 'numerical'
-                            AND c.location != 'header'
-                            AND table_id = ?
-                            GROUP BY table_id, col_id
-                        `)
-    
-                        this.all(stmt, [table_id], cols)
-    
-                        /* 'refine' result of query */
-                        cols = {
-                            table_id: table_id,
-                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                            colIDs: cols.map(res => res['col_id'])
-                        }
-    
-                        /* Re-initialize dynamic programming array */
-                        pValDP = []
-                        for (let i = 0; i < numNumerical; i++) {
-                            pValDP[i] = [];
-                            for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
-                                pValDP[i].push(-1)
-                            }
-                        }
-
-                        bestPerm = {
-                            table_id: table_id,
-                            numericalPerm: [],
-                            chiTestStat: 0,
-                        };
-
-                        curChiTestStat = 0;
-                        idPerms = combinatorics.permutation(cols['colIDs'])
-    
-                        /* Iterate over all permutations of the columns, 
-                         * finding the one that returns the lowest cumulative p-value */
-                        combinatorics.permutation(cols['columns']).forEach(perm => {
-                            idPerm = idPerms.next();
-                            curChiTestStat = 0;
-                            
-                            /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
-                            ssCols.forEach((col, index) => {
-                                /* If haven't calculated matching, fill dp array */
-                                if (pValDP[index][idPerm[index]] < 0) {
-                                     /* Map p-values between 0.1 and 1 to avoid log(0) */
-                                    if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                    pValDP[index][idPerm[index]] = 0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1
-                                    else
-                                        pValDP[index][idPerm[index]] = 0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1 // Low p-values are bad
-                                }
-
-                                
-                                curChiTestStat += Math.log(pValDP[index][idPerm[index]])
-                            })
-                            
-                            curChiTestStat *= -2;
-
-                            if (curChiTestStat > bestPerm['chiTestStat']) {
-                                bestPerm['numericalPerm'] = idPerm;
-                                bestPerm['chiTestStat'] = curChiTestStat
-                            }
-                        })
-    
-                        tables.push(bestPerm)
-                    }
-                }
-                
-
-                resolve(tables);
             } catch (error) {
                 reject(error);
             }
         })
+    }
 
+    getNumericalPerms(results) {
+        /* Get the best permutation for numerical columns for each table */
+
+        var tables = [];
+        var cols = [];
+        var curChiTestStat;
+        var bestPerm;
+        var idPerms;
+        var idPerm;
+        var pValDP = [];
+
+        for (let i = 0; i < numNumerical; i++) 
+            pValDP.push([])
+
+        for (const table_id of union) {
+            cols = [];
+            stmt = this.db.prepare(`
+                SELECT table_id, col_id, toArr(value) AS column
+                FROM cells c NATURAL JOIN columns col
+                WHERE col.type = 'numerical'
+                AND c.location != 'header'
+                AND table_id = ?
+                GROUP BY table_id, col_id
+            `)
+
+            this.all(stmt, [table_id], cols)
+
+            /* 'refine' result of query */
+            cols = {
+                table_id: table_id,
+                columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                colIDs: cols.map(res => res['col_id'])
+            }
+
+            /* Re-initialize dynamic programming array */
+            pValDP = []
+            for (let i = 0; i < numNumerical; i++) {
+                pValDP[i] = [];
+                for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                    pValDP[i].push(-1)
+                }
+            }
+
+            bestPerm = {
+                table_id: table_id,
+                numericalPerm: [],
+                chiTestStat: 0,
+            };
+
+            curChiTestStat = 0;
+            idPerms = combinatorics.permutation(cols['colIDs'])
+
+            /* Iterate over all permutations of the columns, 
+                * finding the one that returns the lowest cumulative p-value */
+            combinatorics.permutation(cols['columns']).forEach(perm => {
+                idPerm = idPerms.next();
+                curChiTestStat = 0;
+                
+                /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
+                ssCols.forEach((col, index) => {
+                    /* If haven't calculated matching, fill dp array */
+                    if (pValDP[index][idPerm[index]] < 0) {
+                            /* Map p-values between 0.1 and 1 to avoid log(0) */
+                        if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
+                        pValDP[index][idPerm[index]] = 0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1
+                        else
+                            pValDP[index][idPerm[index]] = 0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1 // Low p-values are bad
+                    }
+
+                    
+                    curChiTestStat += Math.log(pValDP[index][idPerm[index]])
+                })
+                
+                curChiTestStat *= -2;
+
+                if (curChiTestStat > bestPerm['chiTestStat']) {
+                    bestPerm['numericalPerm'] = idPerm;
+                    bestPerm['chiTestStat'] = curChiTestStat
+                }
+            })
+            tables.push(bestPerm)
+        }
+
+        resolve(tables)
     }
 
     getTextualMatches(tables) {
@@ -675,8 +664,13 @@ class Database {
                 
                 /* No numerical columns */
                 if (tables.length === 0) {
-                    
-                    /* No textual columns */
+                    stmt = this.db.prepare(`
+                        SELECT table_id
+                        FROM columns
+                        WHERE type = 'text'
+                        GROUP BY table_id
+                        HAVING COUNT(DISTINCT col_id) >= ?;
+                    `)
                 } else  {
                     var nP = 0;
                     var tP = 0;
@@ -863,7 +857,7 @@ class Database {
             }       
 
             column = column.map(value => isNaN(value));
-            if (column.indexOf(true) === -1) types.push("numerical")
+            if (column.indexOf(true) === -1 && column.length > 0) types.push("numerical")
             else types.push("text");
         }
 
