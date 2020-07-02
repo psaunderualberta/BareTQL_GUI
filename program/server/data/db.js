@@ -458,6 +458,10 @@ class Database {
                 }).then((results) => {          
                     return this.getTextualMatches(results)
                 }).then((results) => {
+                    return this.getTextualPerms(results)
+                }).then((results) => {
+                    return this.getPermutedRows(results)
+                }).then((results) => {
                     resolve(this.rankResults(results));
                 })
                 .catch((error) => {
@@ -571,7 +575,7 @@ class Database {
         for (let i = 0; i < numNumerical; i++) 
             pValDP.push([])
 
-        for (const table_id of union) {
+        for (const table_id of results) {
             cols = [];
             stmt = this.db.prepare(`
                 SELECT table_id, col_id, toArr(value) AS column
@@ -652,13 +656,6 @@ class Database {
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
 
-        var cols;
-        var cases;
-        var stmt;
-        var rows = this.seedSet['rows'].map(row => row.split(' || '));
-        var orderedRows = [];
-
-
         return new Promise((resolve, reject) => {
             try {
                 
@@ -672,76 +669,91 @@ class Database {
                         HAVING COUNT(DISTINCT col_id) >= ?;
                     `)
                 } else  {
-                    var nP = 0;
-                    var tP = 0;
-
-                    /* Get the best permutation for textual columns for each table */
-                    for (let table of tables) {
-                        cols = [];
-                        stmt = this.db.prepare(`
-                            SELECT table_id, col_id, toArr(value) AS column
-                            FROM cells c NATURAL JOIN columns col
-                            WHERE col.type = 'text'
-                            AND c.location != 'header'
-                            AND c.table_id = ?
-                            GROUP BY table_id, col_id
-                        `)
-
-                        this.all(stmt, [table['table_id']], cols)
-
-                        if (cols.length === 0)
-                            continue
-
-                        cols = {
-                            table_id: cols['table_id'],
-                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
-                            colIDs: cols.map(res => res['col_id'])
-                        }
-
-                        // No rearranging columns for now.
-                        table['textualPerm'] = cols['colIDs']
-
-                        // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
-                        var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
-                        nP = 0;
-                        tP = 0;
-                        cases = "";
-
-                        for (let i = 0; i < this.seedSet['types'].length; i++) {
-                            if (this.seedSet['types'][i] === 'text')
-                                cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
-                            else
-                                cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
-                        }
-
-                        // Columns that are not in the column range of the seed set are ignored.
-                        cases += `ELSE ${ignoredCols}`
-                        
-                        stmt = this.db.prepare(`
-                        SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
-                        FROM
-                        (
-                            SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
-                            FROM cells c
-                            WHERE table_id = ?
-                            AND c.location != 'header'
-                            ORDER BY table_id, row_id, col_order, value ASC
-                        )
-                        WHERE col_order != ?
-                        GROUP BY table_id, row_id
-                        `)
-                        
-                        this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
-
-                    }
                 }
-
-                resolve(orderedRows)
-            } catch (error) {
+            } catch(error) {
                 reject(error)
             }
         })
+    }
 
+    getTextualPerms(results) {
+
+    }
+
+    getPermutedRows(results) {
+        var cols;
+        var cases;
+        var stmt;
+        var orderedRows = [];
+        
+        try {
+            var nP = 0;
+            var tP = 0;
+
+            /* Get the best permutation for textual columns for each table */
+            for (let table of tables) {
+                cols = [];
+                stmt = this.db.prepare(`
+                    SELECT table_id, col_id, toArr(value) AS column
+                    FROM cells c NATURAL JOIN columns col
+                    WHERE col.type = 'text'
+                    AND c.location != 'header'
+                    AND c.table_id = ?
+                    GROUP BY table_id, col_id
+                `)
+
+                this.all(stmt, [table['table_id']], cols)
+
+                if (cols.length === 0)
+                    continue
+
+                cols = {
+                    table_id: cols['table_id'],
+                    columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                    colIDs: cols.map(res => res['col_id'])
+                }
+
+                // No rearranging columns for now.
+                table['textualPerm'] = cols['colIDs']
+
+                // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
+                var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
+                nP = 0;
+                tP = 0;
+                cases = "";
+
+                for (let i = 0; i < this.seedSet['types'].length; i++) {
+                    if (this.seedSet['types'][i] === 'text')
+                        cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
+                    else
+                        cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
+                }
+
+                // Columns that are not in the column range of the seed set are ignored.
+                cases += `ELSE ${ignoredCols}`
+                
+                stmt = this.db.prepare(`
+                SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+                FROM
+                (
+                    SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                    FROM cells c
+                    WHERE table_id = ?
+                    AND c.location != 'header'
+                    ORDER BY table_id, row_id, col_order, value ASC
+                )
+                WHERE col_order != ?
+                GROUP BY table_id, row_id
+                `)
+                
+                this.all(stmt, [table['table_id'], ignoredCols], orderedRows)
+
+            }
+
+            resolve(orderedRows)
+        } catch (error) {
+            reject(error)
+        }
     }
 
     rankResults(results) {
