@@ -525,9 +525,7 @@ class Database {
                             WHERE type = 'numerical'
                             GROUP BY table_id
                             HAVING COUNT(DISTINCT col_id) >= ?
-
                             INTERSECT 
-
                             SELECT table_id
                             FROM columns
                             WHERE type = 'text'
@@ -564,7 +562,7 @@ class Database {
                 if (typeof union === "undefined") {
                     resolve([]) // No results for numerical columns
                 } else {
-                    /* Get the best permutation of numerical columns for each table */
+                    /* Get the best permutation for numerical columns for each table */
                     for (const table_id of union) {
                         cols = [];
                         stmt = this.db.prepare(`
@@ -597,7 +595,7 @@ class Database {
                         bestPerm = {
                             table_id: table_id,
                             numericalPerm: [],
-                            chiTestStat: 0,
+                            chiTestStat: Infinity,
                         };
 
                         curChiTestStat = 0;
@@ -615,18 +613,17 @@ class Database {
                                 if (pValDP[index][idPerm[index]] < 0) {
                                      /* Map p-values between 0.1 and 1 to avoid log(0) */
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                        pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - Number(col[0] === perm[index][0])) + 0.1)
+                                        pValDP[index][idPerm[index]] = Math.log(0.98 * (Number(col[0] === perm[index][0])) + 0.01)
                                     else
-                                        pValDP[index][idPerm[index]] = Math.log(0.9 * (1 - this.ttestCases(col, perm[index])) + 0.1) // Low p-values are bad
+                                        pValDP[index][idPerm[index]] = Math.log(this.ttestCases(col, perm[index])) // Low p-values are bad
                                 }
 
-                                
                                 curChiTestStat += pValDP[index][idPerm[index]]
                             })
                             
                             curChiTestStat *= -2;
 
-                            if (curChiTestStat > bestPerm['chiTestStat']) {
+                            if (curChiTestStat < bestPerm['chiTestStat']) {
                                 bestPerm['numericalPerm'] = idPerm;
                                 bestPerm['chiTestStat'] = curChiTestStat
                             }
@@ -698,15 +695,13 @@ class Database {
                         FROM columns
                         WHERE type = 'text'
                         GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?
-                        LIMIT 10;
+                        HAVING COUNT(DISTINCT col_id) >= ?;
                     `)
 
                     this.all(stmt, [numTextual], tables)
 
                     for (let i = 0; i < tables.length; i++) 
                         tables[i]['numericalPerm'] = [];
-
                 }
 
                 tables.forEach(table =>  {
@@ -739,7 +734,7 @@ class Database {
                     }
         
                     table['textualPerm'] = []
-                    table['bestScore'] = 0;
+                    table['bestScore'] = -1;
         
                     idPerms = combinatorics.permutation(cols['colIDs'])
         
@@ -774,7 +769,7 @@ class Database {
                     })        
                 })
 
-                console.log(tables);
+                // console.log(tables, pValDP);
         
                 resolve(tables)
             } catch(error) {
@@ -872,13 +867,15 @@ class Database {
                         for (let row of rows) {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
-                                    score += Math.pow(row[i] - tableRow[i], 2)
-                                else
-                                    score /= (row[i] === tableRow[i]) ? 2 : (1/2); // Want to remove as many nulls as possible
+                                    score += Math.pow(row[i] - tableRow[i], 2) * (100 - this.seedSet['sliders'][i])
+                                else if (row[i].length > 0 && tableRow[i].length > 0)
+                                    score += (0.75 * (1 - dice(row[i], tableRow[i])) + 0.25)
+                                        * (100 - this.seedSet['sliders'][i])
+                                else 
+                                    score *= 100
                             }
                         }
                         
-                         // Average distance across rows, SUBJECT TO CHANGE
                         results.push({
                             row: tableRow.join(' || '),
                             score: score,

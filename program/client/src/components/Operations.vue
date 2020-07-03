@@ -144,12 +144,13 @@ export default {
 
         executeDotOp() {
             /* Executes the dot op selected by user */
-            console.log('executed')
             var changeButton = function(button, content) {
                 button.textContent = content;
                 button.disabled = !button.disabled;
                 button.classList.toggle('deactivate');
             }
+
+            // this.expandedRows = [];
 
             var submitButton = this.document.querySelector("#dot-op-submit")
             changeButton(submitButton, "Loading Results...")
