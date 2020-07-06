@@ -599,11 +599,11 @@ class Database {
                         };
 
                         curChiTestStat = 0;
-                        idPerms = combinatorics.permutation(cols['colIDs'])
+                        idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
     
                         /* Iterate over all permutations of the columns, 
                          * finding the one that returns the lowest cumulative p-value */
-                        combinatorics.permutation(cols['columns']).forEach(perm => {
+                        combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
                             idPerm = idPerms.next();
                             curChiTestStat = 0;
                             
@@ -688,20 +688,29 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                /* No numerical columns */
-                if (tables.length === 0) {
+                /* No numerical in seed set, look through all textual columns */
+                if (this.seedSet['types'].filter(type => type === 'numerical').length === 0) {
                     stmt = this.db.prepare(`
                         SELECT table_id
                         FROM columns
                         WHERE type = 'text'
+                        AND table_id NOT IN (
+                            SELECT DISTINCT table_id
+                            FROM columns
+                            WHERE type = 'numerical'
+                        )
                         GROUP BY table_id
                         HAVING COUNT(DISTINCT col_id) >= ?;
                     `)
-
+                    
                     this.all(stmt, [numTextual], tables)
 
                     for (let i = 0; i < tables.length; i++) 
                         tables[i]['numericalPerm'] = [];
+
+                } else if (tables.length === 0) {
+                    /* No numerical columns satisfy the slider value */
+                    resolve([])
                 }
 
                 tables.forEach(table =>  {
@@ -734,13 +743,13 @@ class Database {
                     }
         
                     table['textualPerm'] = []
-                    table['bestScore'] = -1;
+                    table['textScore'] = -1;
         
-                    idPerms = combinatorics.permutation(cols['colIDs'])
+                    idPerms = combinatorics.permutation(cols['colIDs'], numTextual)
         
                     /* Iterate over all permutations of the columns, 
-                        * finding the one that returns the lowest cumulative p-value */
-                    combinatorics.permutation(cols['columns']).forEach(perm => {
+                    * finding the one that returns the lowest cumulative p-value */
+                   combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
                         idPerm = idPerms.next();
                         curCumProbs = 0;
                         
@@ -762,14 +771,13 @@ class Database {
 
                         })
                                 
-                        if (curCumProbs > table['bestScore']) {
+                        if (curCumProbs > table['textScore']) {
                             table['textualPerm'] = idPerm;
-                            table['bestScore'] = curCumProbs
+                            table['textScore'] = curCumProbs
                         }
                     })        
-                })
 
-                // console.log(tables, pValDP);
+                })
         
                 resolve(tables)
             } catch(error) {
@@ -800,7 +808,7 @@ class Database {
                 /* Get the best permutation for textual columns for each table */
                 for (let table of tables) {
                     table['rows'] = [];
-                    table['score'] = table['chiTestStat'] + table['bestScore']
+                    table['score'] = table['chiTestStat'] + table['textScore']
 
                     // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
                     var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
@@ -836,7 +844,7 @@ class Database {
     
                     table['rows'] = table['rows'].map(res => {return res['value']})
                 }
-    
+                
                 resolve(tables)
             } catch (error) {
                 reject(error)
@@ -868,11 +876,13 @@ class Database {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
                                     score += Math.pow(row[i] - tableRow[i], 2) * (100 - this.seedSet['sliders'][i])
-                                else if (row[i].length > 0 && tableRow[i].length > 0)
-                                    score += (0.75 * (1 - dice(row[i], tableRow[i])) + 0.25)
-                                        * (100 - this.seedSet['sliders'][i])
-                                else 
-                                    score *= 100
+                                else
+                                    score *= 2;
+                                // else if (row[i].length > 0 && tableRow[i].length > 0)
+                                //     score += (0.75 * (dice(row[i], tableRow[i])) + 0.25)
+                                //         * (100 - this.seedSet['sliders'][i])
+                                // else 
+                                //     score *= 100
                             }
                         }
                         
