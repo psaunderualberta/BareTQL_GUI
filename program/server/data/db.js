@@ -657,13 +657,15 @@ class Database {
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
+        var MinRelThresh = 0.4;
+        var curCumProbs = [];
         var ssCols = [];
         var pValDP = [];
         var cols = [];
-        var curCumProbs;
         var idPerms;
         var column;
         var idPerm;
+        var pass;
         var stmt;
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -718,7 +720,8 @@ class Database {
                     resolve([])
                 }
 
-                tables.forEach(table => {
+                for (let i = 0, table; i < tables.length; i++) {
+                    table = tables[i]
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -756,32 +759,37 @@ class Database {
                     * finding the one that returns the lowest cumulative p-value */
                     combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
                         idPerm = idPerms.next();
-                        curCumProbs = 0;
+                        curCumProbs = [];
 
                         ssCols.forEach((col, index) => {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
-                                for (let i = 0; i < col.length; i++) {
-                                    if (perm.indexOf(col[i]) === -1)
-                                        pValDP[index][idPerm[index]] = sliderIndices[index]
-                                    else
-                                        pValDP[index][idPerm[index]] = 100 - sliderIndices[index]
-                                }
-                                pValDP[index][idPerm[index]] /= col.length
-
+                                const permSet = new Set([...perm[index]]);
+                                // console.log(permSet)
+                                
+                                pValDP[index][idPerm[index]] = new Set(col.filter(x => permSet.has(x))).size / col.length
+                                // if (pValDP[index][idPerm[index]])
+                                //     console.log(pValDP[index][idPerm[index]])
                             }
-                            curCumProbs += pValDP[index][idPerm[index]]
+                            curCumProbs.push(pValDP[index][idPerm[index]])
                         })
 
-                        if (curCumProbs > table['textScore']) {
+                        pass = curCumProbs.every((val, i) => val > Math.max(sliderIndices[i] / 100, MinRelThresh))
+
+                        if (pass && curCumProbs.reduce((a, b) => a + b, 0) > table['textScore']) {
                             table['textualPerm'] = idPerm;
                             table['textScore'] = curCumProbs
                         }
                     })
 
+                    if (table['textualPerm'].length === 0) {
+                        tables.splice(i--, 1)
+                    }
+
+
                     /* Set a 'base score' for the table to be used when ranking rows */
                     table['score'] = table['chiTestStat'] + table['textScore']
-                })
+                }
 
                 resolve(tables)
             } catch (error) {
