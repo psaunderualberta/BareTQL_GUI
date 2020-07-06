@@ -2,7 +2,7 @@
 https://stackabuse.com/a-sqlite-tutorial-with-node-js/
 https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
-*/ 
+*/
 const sqlite3 = require('better-sqlite3');
 const leven = require('leven')
 const ttest = require('ttest');
@@ -71,10 +71,10 @@ class Database {
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
         this.db.function('T_TEST', (arr1, arr2) => {
-                        
+
             arr1 = JSON.parse(arr1).map(num => Number(num))
             arr2 = JSON.parse(arr2).map(num => Number(num))
-            
+
             return this.ttestCases(arr1, arr2)
         })
 
@@ -88,7 +88,7 @@ class Database {
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
         // this.db.function('dice', (str1, str2) => dice(str1, str2))
-    } 
+    }
 
     keywordSearch(keywords, params = []) {
         /* This object queries the database for keywords found in cells, headers, 
@@ -155,20 +155,20 @@ class Database {
         `)
         return new Promise((resolve, reject) => {
             this.all(
-                stmt, 
-                [...keywords, ...keywords], 
+                stmt,
+                [...keywords, ...keywords],
                 results
             )
-            .then(() => {
-                resolve(results)
-            })
-            .catch((err) => {
-                reject(err)
-            })
+                .then(() => {
+                    resolve(results)
+                })
+                .catch((err) => {
+                    reject(err)
+                })
         })
     }
 
-    postSeedSet(tableIDs, rowIDs) {   
+    postSeedSet(tableIDs, rowIDs) {
         /* This method 'posts' the seed set to the database.
          * In reality, we store the seed set as an attribute of the db instance,
          * so that the seed set does not persist. We use the term 'post' in order to
@@ -182,7 +182,7 @@ class Database {
          * 
          * Returns:
          * - Promise: resolves with nothing, rejects with error.
-         */     
+         */
         var customTable = [];
         rowIDs = this.makeStrArr(rowIDs)
         tableIDs = this.makeStrArr(tableIDs)
@@ -217,24 +217,24 @@ class Database {
         `)
 
         return new Promise((resolve, reject) => {
-            this.all( stmt,  [], this.seedSet['rows'])
-            .then(() => {
-                /* 'unpack' results of query */
-                this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-                
-                this.cleanRows(true, true);
+            this.all(stmt, [], this.seedSet['rows'])
+                .then(() => {
+                    /* 'unpack' results of query */
+                    this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
 
-                /* Set sliders to defaults */
-                for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
-                    this.seedSet['sliders'].push(50);
-                }
+                    this.cleanRows(true, true);
 
-                resolve()
-            })
-            .catch((err) => {
-                console.log(err)
-                reject(err)
-            })
+                    /* Set sliders to defaults */
+                    for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
+                        this.seedSet['sliders'].push(50);
+                    }
+
+                    resolve()
+                })
+                .catch((err) => {
+                    console.log(err)
+                    reject(err)
+                })
         })
     }
 
@@ -250,9 +250,9 @@ class Database {
             this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
 
         this.fillNulls(this.seedSet['rows'])
-        
+
         /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
-        if (grouping && ( new Set(this.seedSet['table_ids']).size > 2 || this.seedSet['rows'].length > 10 )) {
+        if (grouping && (new Set(this.seedSet['table_ids']).size > 2 || this.seedSet['rows'].length > 10)) {
             this.groupCols(this.seedSet['rows'])
         }
 
@@ -282,21 +282,21 @@ class Database {
          */
 
         var curRow;
-        
+
         for (let i = 0; i < rows.length; i++) {
-            
+
             /* Split rows into arrays of cells */
             curRow = rows[i].split(' || ');
-            
+
             /* I created this O(n) 'sorting' algorithm for 3 items w/ duplicates
             * when solving the leetcode problem 'sort colours': 
             * https://leetcode.com/problems/sort-colors/ */
             var numPointer = 1;
             var emptyPointer = 1;
-            
+
             for (let j = 1; j < curRow.length; j++) {
                 if (curRow[j] === "NULL") continue;
-                
+
                 this.swap(curRow, emptyPointer, j)
                 if (isNaN(curRow[emptyPointer])) {
                     this.swap(curRow, emptyPointer, numPointer)
@@ -325,7 +325,7 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 var rows = this.seedSet['rows'].map(row => row.split(' || '))
-    
+
                 var tmp = rows[rowIDs[0]][colIDs[0]]
                 rows[rowIDs[0]][colIDs[0]] = rows[rowIDs[1]][colIDs[1]]
                 rows[rowIDs[1]][colIDs[1]] = tmp;
@@ -400,25 +400,25 @@ class Database {
          */
 
         var seedCopy;
-        
+
         return new Promise((resolve, reject) => {
             try {
-                
+
                 for (let i = 0; i < sliderValues.length; i++) {
                     this.seedSet['sliders'][i] = Number(sliderValues[i])
                 }
-                
+
                 /* Handle specific dot op */
                 new Promise((res, rej) => {
                     /* Only upon initialization of the dot-ops page */
                     if (dotOp === 'undefined') {
                         res(this.seedSet['rows'])
-                        
+
                     } else if (dotOp === 'xr') {
                         this.xr()
-                        .then((results) => {
-                            res(results)
-                        })
+                            .then((results) => {
+                                res(results)
+                            })
                     } else if (dotOp === 'xc') {
                         this.xc()
                     } else if (dotOp === 'fill') {
@@ -427,12 +427,12 @@ class Database {
                         rej(`dotOp specified (${dotOp}) is not possible`)
                     }
                 })
-                .then((results) => {
-                    this.fillNulls(results)
-                    seedCopy = {...this.seedSet}
-                    seedCopy['rows'] = results
-                    resolve(seedCopy)
-                })
+                    .then((results) => {
+                        this.fillNulls(results)
+                        seedCopy = { ...this.seedSet }
+                        seedCopy['rows'] = results
+                        resolve(seedCopy)
+                    })
             } catch (error) {
                 reject(error)
             }
@@ -452,17 +452,17 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                .then((results) => {      
-                    return this.getTextualMatches(results)
-                }).then((results) => {
-                    return this.getPermutedRows(results)
-                }).then((results) => {
-                    resolve(this.rankResults(results));
-                })
-                .catch((error) => {
-                    console.log(error);
-                    resolve([])
-                })
+                    .then((results) => {
+                        return this.getTextualMatches(results)
+                    }).then((results) => {
+                        return this.getPermutedRows(results)
+                    }).then((results) => {
+                        resolve(this.rankResults(results));
+                    })
+                    .catch((error) => {
+                        console.log(error);
+                        resolve([])
+                    })
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -475,7 +475,7 @@ class Database {
     }
 
     fill() {
-        
+
     }
 
     getNumericalMatches() {
@@ -490,7 +490,7 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
-        
+
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
@@ -498,7 +498,7 @@ class Database {
         var column = [];
         var ssCols = [];
         var stmt;
-        
+
         return new Promise((resolve, reject) => {
             try {
                 for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -513,7 +513,7 @@ class Database {
                     }
 
                     column = JSON.stringify(column)
-        
+
                     stmt = this.db.prepare(`
                         SELECT DISTINCT table_id
                         FROM cells c NATURAL JOIN columns col    
@@ -524,7 +524,9 @@ class Database {
                             WHERE type = 'numerical'
                             GROUP BY table_id
                             HAVING COUNT(DISTINCT col_id) >= ?
+
                             INTERSECT 
+                            
                             SELECT table_id
                             FROM columns
                             WHERE type = 'text'
@@ -539,8 +541,8 @@ class Database {
                         AND SEM(toArr(value)) < ?;
                     `)
 
-                    this.all(stmt, 
-                        [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]], 
+                    this.all(stmt,
+                        [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]],
                         results[i])
                 }
 
@@ -555,9 +557,9 @@ class Database {
                 var idPerm;
                 var pValDP = [];
 
-                for (let i = 0; i < numNumerical; i++) 
+                for (let i = 0; i < numNumerical; i++)
                     pValDP.push([])
-                
+
                 if (typeof union === "undefined") {
                     resolve([]) // No results for numerical columns
                 } else {
@@ -572,16 +574,16 @@ class Database {
                             AND table_id = ?
                             GROUP BY table_id, col_id
                         `)
-    
+
                         this.all(stmt, [table_id], cols)
-    
+
                         /* 'refine' result of query */
                         cols = {
                             table_id: table_id,
                             columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
                             colIDs: cols.map(res => res['col_id'])
                         }
-    
+
                         /* Re-initialize dynamic programming array */
                         pValDP = []
                         for (let i = 0; i < numNumerical; i++) {
@@ -599,18 +601,18 @@ class Database {
 
                         curChiTestStat = 0;
                         idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
-    
+
                         /* Iterate over all permutations of the columns, 
                          * finding the one that returns the lowest cumulative p-value */
                         combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
                             idPerm = idPerms.next();
                             curChiTestStat = 0;
-                            
+
                             /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
                             ssCols.forEach((col, index) => {
                                 /* If haven't calculated matching, fill dp array */
                                 if (pValDP[index][idPerm[index]] < 0) {
-                                     /* Map p-values between 0.1 and 1 to avoid log(0) */
+                                    /* Map p-values between 0.1 and 1 to avoid log(0) */
                                     if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
                                         pValDP[index][idPerm[index]] = Math.log(0.98 * (Number(col[0] === perm[index][0])) + 0.01)
                                     else
@@ -619,7 +621,7 @@ class Database {
 
                                 curChiTestStat += pValDP[index][idPerm[index]]
                             })
-                            
+
                             curChiTestStat *= -2;
 
                             if (curChiTestStat < bestPerm['chiTestStat']) {
@@ -627,7 +629,7 @@ class Database {
                                 bestPerm['chiTestStat'] = curChiTestStat
                             }
                         })
-    
+
                         tables.push(bestPerm)
                     }
                 }
@@ -682,13 +684,15 @@ class Database {
             }
         })
 
-        for (let i = 0; i < sliderIndices.length; i++) 
+        for (let i = 0; i < sliderIndices.length; i++)
             pValDP.push([])
 
         return new Promise((resolve, reject) => {
             try {
                 /* No numerical in seed set, look through all textual columns */
                 if (this.seedSet['types'].filter(type => type === 'numerical').length === 0) {
+
+                    // Does the first DISTINCT slow things down?
                     stmt = this.db.prepare(`
                         SELECT table_id
                         FROM columns
@@ -701,7 +705,7 @@ class Database {
                         GROUP BY table_id
                         HAVING COUNT(DISTINCT col_id) >= ?;
                     `)
-                    
+
                     this.all(stmt, [numTextual], tables)
 
                     for (let i = 0; i < tables.length; i++) {
@@ -714,7 +718,7 @@ class Database {
                     resolve([])
                 }
 
-                tables.forEach(table =>  {
+                tables.forEach(table => {
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -724,16 +728,16 @@ class Database {
                         AND table_id = ?
                         GROUP BY table_id, col_id
                     `)
-        
+
                     this.all(stmt, [table['table_id']], cols)
-        
+
                     /* 'refine' result of query */
                     cols = {
                         table_id: table['table_id'],
                         columns: cols.map(res => JSON.parse(res['column'])),
                         colIDs: cols.map(res => res['col_id'])
                     }
-        
+
                     /* Re-initialize dynamic programming array */
                     pValDP = []
                     for (let i = 0; i < sliderIndices.length; i++) {
@@ -742,18 +746,18 @@ class Database {
                             pValDP[i].push(-1)
                         }
                     }
-        
+
                     table['textualPerm'] = []
                     table['textScore'] = -1;
-        
+
                     idPerms = combinatorics.permutation(cols['colIDs'], numTextual)
-        
+
                     /* Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative p-value */
-                   combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
+                    combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
                         idPerm = idPerms.next();
                         curCumProbs = 0;
-                        
+
                         ssCols.forEach((col, index) => {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
@@ -762,25 +766,25 @@ class Database {
                                         pValDP[index][idPerm[index]] = sliderIndices[index]
                                     else
                                         pValDP[index][idPerm[index]] = 100 - sliderIndices[index]
-                                }                                
+                                }
                                 pValDP[index][idPerm[index]] /= col.length
 
                             }
-                            
                             curCumProbs += pValDP[index][idPerm[index]]
-
                         })
-                                
+
                         if (curCumProbs > table['textScore']) {
                             table['textualPerm'] = idPerm;
                             table['textScore'] = curCumProbs
                         }
-                    })        
+                    })
 
+                    /* Set a 'base score' for the table to be used when ranking rows */
+                    table['score'] = table['chiTestStat'] + table['textScore']
                 })
-        
+
                 resolve(tables)
-            } catch(error) {
+            } catch (error) {
                 reject(error)
             }
         })
@@ -804,28 +808,26 @@ class Database {
             try {
                 var nP = 0;
                 var tP = 0;
-    
-                /* Get the best permutation for textual columns for each table */
+
                 for (let table of tables) {
                     table['rows'] = [];
-                    table['score'] = table['chiTestStat'] + table['textScore']
 
                     // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
                     var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
                     nP = 0;
                     tP = 0;
                     cases = "";
-    
+
                     for (let i = 0; i < this.seedSet['types'].length; i++) {
                         if (this.seedSet['types'][i] === 'text')
                             cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
                         else
                             cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
                     }
-    
+
                     // Columns that are not in the column range of the seed set are ignored.
                     cases += `ELSE ${ignoredCols}`
-                    
+
                     stmt = this.db.prepare(`
                         SELECT GROUP_CONCAT(value, ' || ') AS value
                         FROM
@@ -839,12 +841,12 @@ class Database {
                         WHERE col_order != ?
                         GROUP BY table_id, row_id
                     `)
-                    
+
                     this.all(stmt, [table['table_id'], ignoredCols], table['rows'])
-    
-                    table['rows'] = table['rows'].map(res => {return res['value']})
+
+                    table['rows'] = table['rows'].map(res => { return res['value'] })
                 }
-                
+
                 resolve(tables)
             } catch (error) {
                 reject(error)
@@ -853,7 +855,9 @@ class Database {
     }
 
     rankResults(tables) {
-        /* Ranks the results that are gotten from getTextualMatches, 
+        /* Ranks the results that are gotten from getTextualMatches
+         * by comparing each potential row with each row in the seed set, giving
+         * that comparison a score, then averaging the scores across seed set rows
          * returns the 10 best
          * 
          * Arguments:
@@ -881,7 +885,7 @@ class Database {
                                 }
                             }
                         }
-                        
+
                         results.push({
                             row: tableRow.join(' || '),
                             score: score,
@@ -889,10 +893,9 @@ class Database {
                     }
                 }
 
-                results = results.sort((res1, res2) => {return res1['score'] - res2['score']}); // Sort in ascending order
-                
-                results = results.slice(0, 10).map(res => {return res['row']})
+                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
 
+                results = results.slice(0, 10).map(res => { return res['row'] })
 
                 resolve(results)
             } catch (error) {
@@ -969,11 +972,14 @@ class Database {
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
                     column.push(rows[j][i])
-            }       
+            }
 
             column = column.map(value => isNaN(value));
-            if (column.indexOf(true) === -1 && column.length > 0) types.push("numerical")
-            else types.push("text");
+
+            if (column.indexOf(true) === -1 && column.length > 0)
+                types.push("numerical")
+            else
+                types.push("text");
         }
 
         return types
@@ -989,20 +995,20 @@ class Database {
          * Returns:
          * - p-value of the t-test */
 
-        var p = null; 
+        var p = null;
         if (arr1.length === 0 || arr2.length === 0)
             return 0 // Lowest p-value possible => worst result (want the best match)
 
-        if (arr1.length === 1 && arr2.length === 1) 
+        if (arr1.length === 1 && arr2.length === 1)
             p = Number(arr1[0] === arr2[0])
-            
+
         /* If only one row in seedSet's numerical col, use one-sample t-test */
         else if (arr1.length === 1)
-            p = Number(ttest(arr2, {mu: arr1[0]}).pValue())
-        else 
+            p = Number(ttest(arr2, { mu: arr1[0] }).pValue())
+        else
             p = Number(ttest(arr1, arr2).pValue())
 
-        return p 
+        return p
     }
 
     makeStrArr(str) {
@@ -1027,7 +1033,7 @@ class Database {
     getQMarks(arr) {
         /* Since the SQL engine uses '?' placeholders in order to format the query,
          * this function determines the number of question marks based on the number
-         * of arguments passed to the query.
+         * of arguments passed to the query (arr).
          * 
          * Arguments:
          * - arr: The array which will be passed to the query engine
@@ -1050,7 +1056,7 @@ class Database {
             })
             qMarks = `(${qMarks.join(', ')})`;
         }
-        
+
         return qMarks
     }
 
@@ -1087,32 +1093,32 @@ module.exports = Database;
         result: array => JSON.stringify(array)
     });
 
-    
-    
+
+
     SELECT table_id, row_id, col_id, value
-    FROM cells c NATURAL JOIN types    
-    WHERE t.type = 'numerical  
+    FROM cells c NATURAL JOIN types
+    WHERE t.type = 'numerical
     AND c.location != 'header'
     GROUP BY table_id, col_id
     HAVING (something about T_TEST)
 */
 
-/* 
+/*
     UNUSED FUNCTIONS
 
         getRelatedTables() {
         /* 'key' refers to primary key, LH column.
-         * 
+         *
          * Get titles of the tables with rows
          * currently in the seed set.
-         * 
+         *
          * Find similar titles (HOW)
          * Try:
          *      - Dice
          *      - Levenshtein
          *      - Jaro-Winkler
-         * 
-         // END COMMENT 
+         *
+         // END COMMENT
         var results = [];
         var limit = 1.0;
         var prom;
@@ -1128,7 +1134,7 @@ module.exports = Database;
                     SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
                     FROM titles t, currentTitles c
                     WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
-                    AND 
+                    AND
                     (
                         (dice(c.title, t.title) >= ${limit})
                     );
@@ -1152,7 +1158,7 @@ module.exports = Database;
         this.db.function('proximity', (cVal, ssVal) => {
             if (!isNaN(ssVal))
                 return Math.abs(Number(cVal) - Number(ssVal))
-            else 
+            else
                 return jaroSim(cVal, ssVal)
         });
 
