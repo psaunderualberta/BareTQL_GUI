@@ -782,14 +782,15 @@ class Database {
                         }
                     })
 
-                    if (table['textualPerm'].length === 0) {
+                    if (table['textualPerm'].length === 0)
                         tables.splice(i--, 1)
-                    }
-
-
                     /* Set a 'base score' for the table to be used when ranking rows */
-                    table['score'] = table['chiTestStat'] + table['textScore']
+                    else
+                        table['score'] = table['chiTestStat'] + table['textScore']
+
                 }
+
+                console.log(tables.map(table => table['table_id']))
 
                 resolve(tables)
             } catch (error) {
