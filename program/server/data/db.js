@@ -4,8 +4,7 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
 */ 
 const sqlite3 = require('better-sqlite3');
-const {similarity, distance, custom} = require('talisman/metrics/jaro-winkler')
-const dice = require('talisman/metrics/dice');
+const leven = require('leven')
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
@@ -705,8 +704,10 @@ class Database {
                     
                     this.all(stmt, [numTextual], tables)
 
-                    for (let i = 0; i < tables.length; i++) 
+                    for (let i = 0; i < tables.length; i++) {
                         tables[i]['numericalPerm'] = [];
+                        tables[i]['chiTestStat'] = 0;
+                    }
 
                 } else if (tables.length === 0) {
                     /* No numerical columns satisfy the slider value */
@@ -753,7 +754,6 @@ class Database {
                         idPerm = idPerms.next();
                         curCumProbs = 0;
                         
-                        /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
                         ssCols.forEach((col, index) => {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
@@ -876,13 +876,9 @@ class Database {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
                                     score += Math.pow(row[i] - tableRow[i], 2) * (100 - this.seedSet['sliders'][i])
-                                else
-                                    score *= 2;
-                                // else if (row[i].length > 0 && tableRow[i].length > 0)
-                                //     score += (0.75 * (dice(row[i], tableRow[i])) + 0.25)
-                                //         * (100 - this.seedSet['sliders'][i])
-                                // else 
-                                //     score *= 100
+                                else {
+                                    score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2) * (100 - this.seedSet['sliders'][i])
+                                }
                             }
                         }
                         
@@ -896,6 +892,7 @@ class Database {
                 results = results.sort((res1, res2) => {return res1['score'] - res2['score']}); // Sort in ascending order
                 
                 results = results.slice(0, 10).map(res => {return res['row']})
+
 
                 resolve(results)
             } catch (error) {
