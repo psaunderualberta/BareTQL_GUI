@@ -217,7 +217,6 @@ export default {
             if (keywords.length > 0) {
                 changeButton(submitButton, "Loading...");
                 ResultService.getKeywords(keywords)
-
                 .then((data) => {
                     changeButton(submitButton, "Submit Query");
                     this.results = data

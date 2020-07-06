@@ -765,12 +765,9 @@ class Database {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
                                 const permSet = new Set([...perm[index]]);
-                                // console.log(permSet)
-                                
                                 pValDP[index][idPerm[index]] = new Set(col.filter(x => permSet.has(x))).size / col.length
-                                // if (pValDP[index][idPerm[index]])
-                                //     console.log(pValDP[index][idPerm[index]])
                             }
+
                             curCumProbs.push(pValDP[index][idPerm[index]])
                         })
 
@@ -789,8 +786,6 @@ class Database {
                         table['score'] = table['chiTestStat'] + table['textScore']
 
                 }
-
-                console.log(tables.map(table => table['table_id']))
 
                 resolve(tables)
             } catch (error) {

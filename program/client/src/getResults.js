@@ -215,38 +215,47 @@ class ResultService {
         /* Standard pipe and config from Wink-bm25 documentation
          * https://www.npmjs.com/package/wink-bm25-text-search
          * Accessed June 19th, 2020 */
-        if (Object.keys(tables).length <= 1) {
-            return tables
-        }
-
+        
         var rankedTables = [];
         var engine = bm25();
         
-        // Preparatory tasks
-        engine.defineConfig( { 
-            fldWeights: {title: 1, rows: 1},
-            bm25Params: {k1: 1.2, b: 0.3, k: 0.75}
-        });
-        engine.definePrepTasks(pipe);
-        ResultService.addTablesToEngine(tables, engine)
-
-        // Indexing
-        engine.consolidate()
-
-        // Searching
-        let results = engine.search(keywords, 20)
-
-        var id;
-        var table;
-
-        results.forEach(result => {
-            id = result[0]
-            table = tables[id]
-            rankedTables.push({
-                table_id: id,
-                ...table,
+        // /* Handle the case of 1 query result separately */
+        if (Object.keys(tables).length <= 1) {
+            Object.keys(tables).forEach(id => {
+                rankedTables.push({
+                    table_id: id,
+                    ...tables[id]
+                })
             })
-        })
+        } else {
+
+            // Preparatory tasks
+            engine.defineConfig( { 
+                fldWeights: {title: 1, rows: 1},
+                bm25Params: {k1: 1.2, b: 0.3, k: 0.75}
+            });
+    
+            engine.definePrepTasks(pipe);
+            ResultService.addTablesToEngine(tables, engine)
+    
+            // Indexing
+            engine.consolidate()
+    
+            // Searching
+            let results = engine.search(keywords, 20)
+    
+            var id;
+            var table;
+    
+            results.forEach(result => {
+                id = result[0]
+                table = tables[id]
+                rankedTables.push({
+                    table_id: id,
+                    ...table,
+                })
+            })
+        }
 
         return rankedTables
 
