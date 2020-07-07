@@ -1,68 +1,86 @@
 <template>
-    <div>
-        <div class="separate-components centering">
+    <div id="seed-set">
+        <div class="separate-components centering" style="margin-bottom: 1%; ">
             <Logo />
-        </div>
 
-        <!-- LHS of Webpage -->
-        <div class="page">
-            <div class="separate-components centering">
-                <h2>Please enter query information:</h2>
-                <hr style="width: 90%; margin-bottom: 20px;">
-                
-                <!-- Form to submit keyword queries -->
-                <form v-on:submit.prevent="submitQuery">
-                    <p v-if="errors.length">
-                        <strong>
-                            Please enter at least one keyword
-                        </strong>
+
+        </div>
+        <div class="separate-components centering">            
+            <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
+                <template #hidden>
+                    <p>
+                        Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables. <br>
+                        There are two parts to the tool: the screen you are looking at right now is the first screen, where keyword searching occurs.
                     </p>
-                    
-                    <div class="inputField">
-                        <input type="text" id="keywords" 
-                            placeholder="Enter keyword(s)">
-                    </div>
-                    <br>
-                    <div class="inputField">
-                        <input type="submit">
-                    </div>
-                </form>
-            </div>
-            <hr>
+                </template>
+            </Instruction>
+            <button @click="showInstructions">Click me to learn how to use BareTQL!</button>
 
-            <!-- Display for selected seed set rows -->
-            <div class="separate-components centering">
-                <h3>Seed Set</h3>
-                <p v-if="table['numRows'] === 0">
-                    No seed set rows have been selected
+            <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
+
+                <template #hidden>
+                    <p>
+                        <br>
+                        This is where you can enter keywords to search for in the database.<br>
+                        Separate individual keywords by a comma, and then click the submit button below to run your query. Note
+                        that common words like 'the' or 'and' will take longer to query, just because they are more common in the database.
+                    </p>
+                </template>
+            </Instruction>
+            <!-- Form to submit keyword queries -->
+            <form v-on:submit.prevent="submitQuery">
+                <p v-if="errors.length">
+                    <strong>
+                        Please enter at least one keyword
+                    </strong>
                 </p>
-                <div v-else>
-
-                    <!-- Table content -->
-                    <UserTable :table="table['rows']" />
-                    <button @click="postSeedSet">Use as Seed Set</button>
+                <div class="inputField">
+                    <input type="text" id="keywords" 
+                        placeholder="Enter keyword(s)">
                 </div>
-            </div>
+                <br>
+                <div class="inputField">
+                    <button type="submit" id="submit-query-button">Submit Query</button>
+                </div>
+            </form>
         </div>
 
-        <!-- RHS of Page -->
+
+        <!-- LHS of Page -->
         <div class="page">
             <div class="separate-components">
                 <div class="centering">
-                    <h4>Results</h4>
+                    <Instruction ref="instruction-3" index="3">
+                        <template #shown>
+                            <h3>Results</h3>
+                        </template>
+                        
+                        <template #hidden>
+                            <p>
+                                This the the 'Results' tab, where the results of your query will be shown, separated into tables. <br>
+                                Click on the title of a table to see its rows, and click on a row to add it to your seed set.
+                            </p>
+                        </template>
+                    </Instruction>
+
+
                 </div>
 
                 <!-- List of tables for results -->
                 <ul v-if="Object.keys(results).length > 0">
 
                     <!-- Summary of results -->
-                    <p class="centering">
-                        There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'.<br>
+                    <p v-if="Object.keys(results).length === 20" class="centering">
+                        These are the top 20 tables that match the keywords '{{ keywords }}'. <br>
+                        Click on a title to view the table's rows.
+                    </p>
+                    <p v-else class="centering">
+                        There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'. <br>
                         Click on a title to view the table's rows.
                     </p>
 
                     <!-- Display for query results -->
-                    <form>
+                    <form style="font-size: 0.9em;">
                         <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
                             <!-- Row title, clicking on title reveals rows of table -->
                             <!-- /* https://codepen.io/Idered/pen/AeBgF */ -->
@@ -71,9 +89,11 @@
                             <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
                                 v-html="'List of '
                                         + makeKeywordsBold(table['title'], keywords) 
-                                        + ': (contains '
+                                        + ': ('
                                         + Object.keys(results[table_rank]['rows']).length
-                                        + ' matching rows)'">
+                                        + (Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ')
+                                        + results[table_rank]['rowCount']
+                                        + ' rows)'">
                             </label>
                                 
                             <!-- Rows of table -->
@@ -100,6 +120,40 @@
                 </p>
             </div>
         </div>
+
+        <!-- RHS of Webpage -->
+        <div class="page">
+
+            <!-- Display for selected seed set rows -->
+            <div class="separate-components centering">
+                <Instruction ref="instruction-4" index="4">
+                    <template #shown>
+                        <h3>Seed Set</h3>
+                    </template>
+
+                    <template #hidden>
+                        <p>
+                            This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
+                            click the button below the table to move to the next portion of the app: Set Expansion.
+                        </p>
+                    </template>
+
+                    <template #button-text>
+                        End Tutorial
+                    </template>
+
+                </Instruction>
+                <p v-if="table['numRows'] === 0">
+                    No seed set rows have been selected
+                </p>
+                <div v-else>
+
+                    <!-- Table content -->
+                    <UserTable :table="table['rows']" :allowSelection="false"/>
+                    <button @click="postSeedSet">Use as Seed Set</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -107,45 +161,74 @@
 import Logo from './Logo.vue'
 import ResultService from '../getResults.js'
 import UserTable from './UserTable.vue'
+import Instruction from './Instruction.vue'
 
 export default {
     name: 'SeedSet',
     components: {
         Logo,
-        UserTable
+        UserTable,
+        Instruction,
     },
 
     data: function() {
         return {
-            keywords: 'Australia, Cat',
+            keywords: '',
             results: "",
             errors: [],
             selectedRows: [],
-            document: document,     
+            document: document,  
         }
     },
 
     methods: {
+
+        async showInstructions() {
+            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input, label")
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = true; inp.classList.toggle('deactivate')}
+
+            for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
+                await this.$refs[`instruction-${i}`].handleClick();
+            }
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = false; inp.classList.toggle('deactivate')}
+        },
+
+        /* Use single button in corner as measure of when to increment i */
+
         submitQuery() {
             /* Submits the keyword query to the backend,
              * assigns the result of the query (after formatting)
              * to the 'results' data
              */
+            var changeButton = function(button, content) {
+                button.textContent = content;
+                button.disabled = !button.disabled;
+                button.classList.toggle('deactivate');
+            }
+
             this.errors = [];
             this.selectedRows = [];
-            this.keywords = this.document.querySelector('#keywords').value // Only update keywords here, not on change
+            var keywords = this.document.querySelector('#keywords').value // Only update keywords here, not on change
+            var submitButton = this.document.querySelector('#submit-query-button')
 
             // https://vuejs.org/v2/cookbook/form-validation.html
-            if (this.keywords.length > 0) {
-                ResultService.getKeywords(this.keywords)
+            if (keywords.length > 0) {
+                changeButton(submitButton, "Loading...");
+                ResultService.getKeywords(keywords)
                 .then((data) => {
+                    changeButton(submitButton, "Submit Query");
                     this.results = data
+                    this.keywords = keywords
+
                 }).catch((err) => {
+                    changeButton(submitButton, err);
                     console.log(err);
                 })     
             } else {
                 if (this.keywords.length === 0) {
-                        this.errors.push(0); // Need at least one item, doesn't matter what
+                    this.errors.push(0); // Need at least one item, doesn't matter what
                 }
 
             }
@@ -186,9 +269,8 @@ export default {
              * https://x-team.com/blog/highlight-text-vue-regex/
              * Accessed June 9th, 2020
              */
-
-            return str.replace(new RegExp(keywords.split(/ *, */).join('|'), 'gi'), match => {
-                return '<strong>' + match + '</strong>'
+            return str.replace(new RegExp(`[^a-zA-Z](?:${keywords.split(/ *, */).join('|')})(?=[^a-zA-Z]|$)`, 'gi'), match => {
+                return '<strong> ' + match + ' </strong>'
             })
         },
 
@@ -212,7 +294,7 @@ export default {
                 numRows: numRows,
                 numCols: numCols,
             }
-        }
+        },
     }
 }
 
@@ -228,7 +310,7 @@ input {
 input[type='text'] {
     border: 5px solid white;
     height: 100%;
-    width: 35%;
+    width: 30%;
 }
 
 .top-most-li {

@@ -2,9 +2,12 @@
 https://stackabuse.com/a-sqlite-tutorial-with-node-js/
 https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
-*/ 
+*/
 const sqlite3 = require('better-sqlite3');
 const leven = require('leven')
+const ttest = require('ttest');
+const statistics = require('simple-statistics')
+const combinatorics = require('js-combinatorics')
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -29,15 +32,16 @@ class Database {
             console.log(`Something went wrong with dbPath: ${dbPath}: ${error}`);
             return
         }
-        console.log("Connected to database");
 
-        this.db.function('leven', (str1, str2) => leven(str1, str2));
-        // this.db.loadExtension('./spellfix')                // for Linux
-        // this.db.loadExtension('./spellfix.dll')           //  <-- UNCOMMENT HERE FOR WINDOWS
+        console.log(`Connected to database at ${dbPath}`);
 
         this.seedSet = {
             sliders: [],
             rows: [],
+            types: [],
+            table_ids: '',
+            row_ids: '',
+            numCols: 0,
         };
 
         this.functions = {
@@ -45,7 +49,46 @@ class Database {
             xc: this.xc,
             fill: this.fill,
         }
-    } 
+
+        this.cellSep = ' || '
+
+        // var jaroSim = function(str1, str2) {return similarity(str1, str2)}
+        // var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
+
+        /* Aggregate function to turn col into array 
+         * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
+         * Accessed June 23rd, 2020 */
+        this.db.aggregate('toArr', {
+            start: () => [],
+            step: (array, nextValue) => {
+                array.push(nextValue);
+            },
+            result: array => JSON.stringify(array)
+        });
+
+        /* We are using Welch's t-test to calculate the probability
+         * of two numerical columns being related
+         * https://en.wikipedia.org/wiki/Welch%27s_t-test
+         * Accessed June 23 2020 */
+        this.db.function('T_TEST', (arr1, arr2) => {
+
+            arr1 = JSON.parse(arr1).map(num => Number(num))
+            arr2 = JSON.parse(arr2).map(num => Number(num))
+
+            return this.ttestCases(arr1, arr2)
+        })
+
+        this.db.function('SEM', (arr) => {
+            arr = JSON.parse(arr).map(num => Number(num))
+
+            return statistics.standardDeviation(arr) / (Math.sqrt(arr.length) + 1e-5) // Avoid division by 0
+        })
+
+        this.db.function('isNumber', (num) => 1 - Number(isNaN(num)))
+
+        // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
+        // this.db.function('dice', (str1, str2) => dice(str1, str2))
+    }
 
     keywordSearch(keywords, params = []) {
         /* This object queries the database for keywords found in cells, headers, 
@@ -72,55 +115,60 @@ class Database {
          * locations on same table, leading to repeated rows in output
          */
         const stmt = this.db.prepare(`
-            SELECT DISTINCT table_id, title, row_id, value
+            SELECT DISTINCT r.table_id, title, row_id, value, rowCount
             FROM
             (
-                SELECT t.table_id, t.title, c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
-                    CASE k.location 
-                        WHEN 'title' THEN '1'
-                        WHEN 'caption' THEN '2'
-                        WHEN 'header' THEN '3'
-                        WHEN 'cell' THEN '4'
-                    END AS location
-                FROM titles t, keywords_cell_header k, cells c
-                WHERE t.table_id = k.table_id AND k.table_id = c.table_id
-                AND k.row_id = c.row_id
+                SELECT DISTINCT t.table_id, t.title, c.row_id, value
+                FROM titles t NATURAL JOIN keywords_cell_header k NATURAL JOIN (
+                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value 
+                    FROM cells 
+                    GROUP BY table_id, row_id
+                ) c
+                WHERE k.row_id = c.row_id
                 AND k.keyword IN ${keywordQMarks}
                 GROUP BY t.table_id, c.row_id
     
                 UNION
     
-                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value,
-                    CASE k.location 
-                        WHEN 'title' THEN '1'
-                        WHEN 'caption' THEN '2'
-                        WHEN 'header' THEN '3'
-                        WHEN 'cell' THEN '4'
-                    END AS location
-                FROM keywords_title_caption k, titles t, cells c
-                WHERE k.table_id = t.table_id AND t.table_id = c.table_id 
-                AND k.keyword IN ${keywordQMarks}
+                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
+                FROM (
+                    SELECT DISTINCT table_id 
+                    FROM keywords_title_caption 
+                    WHERE keyword IN ${keywordQMarks}
+                ) k, titles t, cells c
+                WHERE k.table_id = t.table_id AND t.table_id = c.table_id
                 GROUP BY t.table_id, c.row_id
     
-                ORDER BY location, t.table_id, c.row_id
-            );
+                ORDER BY t.table_id, c.row_id
+            ) r
+
+            LEFT JOIN 
+            
+            (
+                SELECT table_id, COUNT(DISTINCT row_id) AS rowCount
+                FROM cells
+                GROUP BY table_id
+            ) c
+            
+            ON r.table_id = c.table_id;
+
         `)
         return new Promise((resolve, reject) => {
             this.all(
-                stmt, 
-                [...keywords, ...keywords], 
+                stmt,
+                [...keywords, ...keywords],
                 results
             )
-            .then(() => {
-                resolve(results)
-            })
-            .catch((err) => {
-                reject(err)
-            })
+                .then(() => {
+                    resolve(results)
+                })
+                .catch((err) => {
+                    reject(err)
+                })
         })
     }
 
-    postSeedSet(tableIDs, rowIDs) {   
+    postSeedSet(tableIDs, rowIDs) {
         /* This method 'posts' the seed set to the database.
          * In reality, we store the seed set as an attribute of the db instance,
          * so that the seed set does not persist. We use the term 'post' in order to
@@ -134,7 +182,7 @@ class Database {
          * 
          * Returns:
          * - Promise: resolves with nothing, rejects with error.
-         */     
+         */
         var customTable = [];
         rowIDs = this.makeStrArr(rowIDs)
         tableIDs = this.makeStrArr(tableIDs)
@@ -142,11 +190,18 @@ class Database {
         this.seedSet = {
             sliders: [],
             rows: [],
+            types: [],
+            table_ids: tableIDs.map(id => id.trim()),
+            row_ids: rowIDs.map(id => id.trim()),
+            numCols: 0,
         };
 
         /* Create 'table' based on values of tableIDs, rowIDs
          * https://stackoverflow.com/questions/985295/can-you-define-literal-tables-in-sql
          * Accessed June 9th, 2020
+         * 
+         * This breaks if we have more than 500 rows in the seed set, but if a user is selecting 500
+         * rows then that's their problem.
          */
         for (let i = 0; i < rowIDs.length; i++) {
             customTable.push(`SELECT ${tableIDs[i].trim()} AS table_id, ${rowIDs[i].trim()} AS row_id`)
@@ -154,7 +209,7 @@ class Database {
         customTable = `(${customTable.join(' UNION ALL ')})`
 
         const stmt = this.db.prepare(` 
-            SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value
+            SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, '${this.cellSep}') AS value
             FROM cells 
             WHERE (table_id, row_id) IN ${customTable}
             GROUP BY table_id, row_id
@@ -162,22 +217,129 @@ class Database {
         `)
 
         return new Promise((resolve, reject) => {
-            this.all(
-                stmt, 
-                [],
-                this.seedSet['rows']
-            )
-            .then(() => {
-                this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
-                for (let i = 0; i < this.seedSet['rows'][0].split(' || ').length; i++) {
-                    this.seedSet['sliders'].push(10);
+            this.all(stmt, [], this.seedSet['rows'])
+                .then(() => {
+                    /* 'unpack' results of query */
+                    this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
+
+                    this.cleanRows(true, true);
+
+                    /* Set sliders to defaults */
+                    for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
+                        this.seedSet['sliders'].push(50);
+                    }
+
+                    resolve()
+                })
+                .catch((err) => {
+                    console.log(err)
+                    reject(err)
+                })
+        })
+    }
+
+    cleanRows(changeSeed, grouping) {
+        /* Performs the steps to clean the rows of the seed set,
+         * including finding the number of cols, filling Null values, 
+         * grouping columns, and getting the types of the columns
+         * 
+         * Returns: 
+         * - None, as it does the operations in-place */
+
+        if (changeSeed)
+            this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
+
+        this.fillNulls(this.seedSet['rows'])
+
+        /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
+        if (grouping && (new Set(this.seedSet['table_ids']).size > 2 || this.seedSet['rows'].length > 10)) {
+            this.groupCols(this.seedSet['rows'])
+        }
+
+
+        if (changeSeed)
+            this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
+
+    }
+
+    groupCols(rows) {
+        /* Attempts to group columns based on similar datatypes
+         * The datatypes we are considering are: 'null', 'numerical',
+         * and 'text' if neither of these two options are satisfied.
+         * This is designed to be a general grouping measure, as 
+         * we provide the user with the option to manually rearrange cells themselves.
+         * Cells are only swapped across columns; they are not swapped between rows.
+         * 
+         * We are grouping the columns thusly: 
+         * [PRIMARY KEY (unchanged), ...text, ...numerical, ...empty cells]
+         * 
+         * Arguments:
+         * - rows: The array of rows, with cells separated with the phrase '||'
+         * 
+         * Returns:
+         * - the 'rows' argument with each row (possibly) rearranged according
+         *   to the description above.
+         */
+
+        var curRow;
+
+        for (let i = 0; i < rows.length; i++) {
+
+            /* Split rows into arrays of cells */
+            curRow = rows[i].split(' || ');
+
+            /* I created this O(n) 'sorting' algorithm for 3 items w/ duplicates
+            * when solving the leetcode problem 'sort colours': 
+            * https://leetcode.com/problems/sort-colors/ */
+            var numPointer = 1;
+            var emptyPointer = 1;
+
+            for (let j = 1; j < curRow.length; j++) {
+                if (curRow[j] === "NULL") continue;
+
+                this.swap(curRow, emptyPointer, j)
+                if (isNaN(curRow[emptyPointer])) {
+                    this.swap(curRow, emptyPointer, numPointer)
+                    numPointer++;
                 }
-                resolve()
-            })
-            .catch((err) => {
-                console.log(err);
-                reject(err)
-            })
+
+                emptyPointer++;
+            }
+
+            rows[i] = curRow.join(' || ');
+        }
+    }
+
+    swapCells(rowIDs, colIDs) {
+        /* Swaps the two cells selected by the user, denoted
+         * by the positions of values in rowIDs, colIDs
+         * 
+         * Arguments:
+         * - rowIDs: the row ids of the cells to be swapped in the seed set
+         * - colIDs: the column ids of the cells to be swapped, matching indices
+         *      with rowIDs
+         * 
+         * Returns:
+         * - Promise which resolves if cells were successfully swapped, rejection otherwise */
+
+        return new Promise((resolve, reject) => {
+            try {
+                var rows = this.seedSet['rows'].map(row => row.split(' || '))
+
+                var tmp = rows[rowIDs[0]][colIDs[0]]
+                rows[rowIDs[0]][colIDs[0]] = rows[rowIDs[1]][colIDs[1]]
+                rows[rowIDs[1]][colIDs[1]] = tmp;
+
+                this.seedSet['rows'] = rows.map(row => row.join(' || '))
+
+                this.cleanRows(true, false)
+
+                resolve(this.seedSet);
+
+            } catch (err) {
+                reject(err);
+            }
+
         })
     }
 
@@ -203,18 +365,20 @@ class Database {
 
                 /* Delete columns in the table */
                 for (let i = 0; i < this.seedSet['rows'].length; i++) {
-                    row = this.seedSet['rows'][i].split(' || ')
+                    row = this.seedSet['rows'][i].split(this.cellSep)
                     cols.forEach(col => {
                         delete row[col - 1] // We use 1-indexing on front-end, convert to 0-indexing
                     })
 
                     row = row.filter(cell => typeof cell !== 'undefined')
                     if (row.length > 0) {
-                        this.seedSet['rows'][i] = row.join(' || ');
+                        this.seedSet['rows'][i] = row.join(this.cellSep);
                     } else {
                         this.seedSet['rows'][i] = row
                     }
                 }
+
+                this.cleanRows(true, false)
 
                 resolve(this.seedSet);
             } catch (error) {
@@ -234,66 +398,73 @@ class Database {
          * Returns:
          * - Promise: resolves with new rows of seed set, rejects with error.
          */
-        
-        return new Promise((resolve, reject) => {
-            /* Only upon initialization of the dot-ops page */
-            if (dotOp === 'undefined') {
-                resolve(this.seedSet)
-            }
 
-            for (let i = 0; i < sliderValues.length; i++) {
-                this.seedSet['sliders'][i] = Number(sliderValues[i]) / 5
-            }
-            
-            new Promise((res, rej) => {
-                if (dotOp === 'xr') {
-                    this.xr()
-                } else if (dotOp === 'xc') {
-                    this.xc()
-                    resolve()
-                } else if (dotOp === 'fill') {
-                    this.fill()
-                    resolve()
-                } else {
-                    rej(`dotOp specified (${dotOp}) is not possible`)
+        var seedCopy;
+
+        return new Promise((resolve, reject) => {
+            try {
+
+                for (let i = 0; i < sliderValues.length; i++) {
+                    this.seedSet['sliders'][i] = Number(sliderValues[i])
                 }
-                res();
-            })
-            .then(() => {
-                resolve(this.seedSet)
-            })
-            .catch((err) => {
-                reject(err);
-            })
+
+                /* Handle specific dot op */
+                new Promise((res, rej) => {
+                    /* Only upon initialization of the dot-ops page */
+                    if (dotOp === 'undefined') {
+                        res(this.seedSet['rows'])
+
+                    } else if (dotOp === 'xr') {
+                        this.xr()
+                            .then((results) => {
+                                res(results)
+                            })
+                    } else if (dotOp === 'xc') {
+                        this.xc()
+                    } else if (dotOp === 'fill') {
+                        this.fill()
+                    } else {
+                        rej(`dotOp specified (${dotOp}) is not possible`)
+                    }
+                })
+                    .then((results) => {
+                        this.fillNulls(results)
+                        seedCopy = { ...this.seedSet }
+                        seedCopy['rows'] = results
+                        resolve(seedCopy)
+                    })
+            } catch (error) {
+                reject(error)
+            }
         })
     }
 
     xr() {
-        /* Append rows to table which are related
-         * to the current table
+        /* Delegates tasks related to the set expansion of
+         * seed set rows.
          *
-         * PSEUDO:
-         * 1. Find related tables to the current table
-         *      a) Give each table a 'related' score based on # 
-         *         of rows which match
-         *      b) Identify the row and column mapping from current table
-         * 2. Create new rows based on the column mapping for each table,
-         *      add the 'related' score to the score for each row
-         * 3. Sort the created rows based on the score.
-         * 4. Append the rows with the highest score to the seed set.
+         * Returns:
+         * - Promise which resolves if successfully completed search,
+         *      rejects otherwise
          *
          */
 
         return new Promise((resolve, reject) => {
             try {
-                this.getRelatedTables()
-                .then((results) => {
-                    resolve();
-                })
-                .catch((error) => {
-                    reject(error);
-                })
+                this.getNumericalMatches()
+                    .then((results) => {
+                        return this.getTextualMatches(results)
+                    }).then((results) => {
+                        return this.getPermutedRows(results)
+                    }).then((results) => {
+                        resolve(this.rankResults(results));
+                    })
+                    .catch((error) => {
+                        console.log(error);
+                        resolve([])
+                    })
             } catch (error) {
+                console.log(error);
                 reject(error);
             }
         })
@@ -304,216 +475,447 @@ class Database {
     }
 
     fill() {
-        
+
     }
 
-    getRelatedTables() {
-        /* 'key' refers to primary key, LH column.
+    getNumericalMatches() {
+        /* for every numerical column in the seed set, getNumericalMatches
+         * compares its distribution with the numerical columns in the database
+         * using Welch's t-distribution test, or the one-sample test depending on 
+         * the length of the seed set. We then sort these columns based on their p-value,
+         * and organize them according to the seed set column they are being compared
          * 
-         * Iterate over all keys
-         * Check if length of key makes it possible to match.
-         * If keys match (based on levenshtein distance)
-         *     If that table contains the entire row
-         *         Add to list of potential tables
+         * Arguments:
+         * None
          * 
-         * Count # of times each table shows up in
-         * list of potential tables
-         * 
-         * Only take tables which appear enough times
-         * 
-         * For each potential table:
-         *      Eliminate if table has fewer columns OR # of rows < self.num_rows * relational_threshold)
-         *      Determine column & row mapping, related score of table
-         *      If the related_score > relational_threshold: 
-         *          Add mappings, value to list of related tables
-         * 
-         * return list of related tables
-         * 
-         */ 
-    
+         * Returns:
+         * - Promise which resolves if query is successful, rejects otherwise.*/
+
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var results = [];
+        var column = [];
+        var ssCols = [];
+        var stmt;
+
         return new Promise((resolve, reject) => {
-            var stmt, stmtString, params;
-            var rows = this.seedSet['rows']
-
             try {
-
-                // Can't split rows into cells, since object keys cannot be arrays
-                var rowTables = { }
-                rows.forEach(row => {
-                    rowTables[row] = []
-                })
-
-                /* Identify tables with pk within edit distance of key */
-                var customTable = [];
-                var splitRow;
-                Object.keys(rowTables).forEach(row => {  
-                    customTable = [];
-                    splitRow = row.split(' || ');
-
-                    var customTable = this.makeTempTable(splitRow);
-                    /* Create 'table' based on values of splitRow cells, slider values
-                    * https://stackoverflow.com/questions/985295/can-you-define-literal-tables-in-sql
-                    * Accessed June 12th, 2020
-                    */
-                    
-                    stmtString = `
-                        -- Primary key specific 
-                        SELECT table_id, row_id
-                        FROM cells c
-                        WHERE c.col_id = 0
-                        AND row_id > 0
-                        AND leven(?, value) <= ?
-                    `;
- 
-                    /* kept separate, since if a row has only one column this
-                        second query will produce an empty set which we do not want */
-                    if (splitRow.length > 1) {
-                        stmtString += `
-                            INTERSECT
- 
-                            -- all other columns
-                            SELECT table_id, row_id
-                            FROM cells c, ${customTable} AS custom
-                            WHERE c.col_id > 0
-                            AND row_id > 0 -- Ensures we don't column headers in output
-                            AND leven(custom.word, c.value) < custom.edit_limit
-                            GROUP BY c.table_id, c.row_id
-                            HAVING COUNT(DISTINCT custom.word) = ?
-                            AND COUNT(DISTINCT c.col_id) = ? 
-                            AND MAX(c.col_id) >= ?
-                        `
-                        params = [splitRow[0], this.seedSet['sliders'][0], splitRow.length - 1, splitRow.length - 1, splitRow.length - 1];
-                    } else {
-                        params = [splitRow[0], this.seedSet['sliders'][0]];
+                for (let i = 0; i < this.seedSet['types'].length; i++) {
+                    results.push([])
+                    if (this.seedSet['types'][i] !== 'numerical')
+                        continue
+                    ssCols.push([])
+                    column = ssCols[ssCols.length - 1]
+                    for (let j = 0; j < rows.length; j++) {
+                        if (rows[j][i] !== "NULL")
+                            column.push(Number(rows[j][i]))
                     }
-                    stmt = this.db.prepare(stmtString)
-                    this.all(stmt, params, rowTables[row])
-                })
 
-                /* Organize results into object, where key is a table_id and
-                 * value is an array of all rows which match. There is no defined ordering,
-                 * although the query returns the rows in ascending order since that is how
-                 * they are represented in the database.
-                 */
-                var tables = { };
-                var sortedTables = [];
-                Object.keys(rowTables).forEach(key => {
-                    rowTables[key].forEach(result => {
-                        if (tables[result['table_id']]) {
-                            tables[result['table_id']].push(result['row_id'])
-                        } else {
-                            tables[result['table_id']] = [result['row_id']]
-                        }
-                    })
-                })
+                    column = JSON.stringify(column)
 
-                /* http://stackoverflow.com/questions/1069666/ddg#16794116
-                 * Accessed June 15th, 2020
-                 */
-                sortedTables = Object.keys(tables).sort((key1, key2) => {
-                    return tables[key1] - tables[key2]
-                }).reverse();
+                    stmt = this.db.prepare(`
+                        SELECT DISTINCT table_id
+                        FROM cells c NATURAL JOIN columns col    
+                        WHERE c.table_id IN 
+                        (
+                            SELECT table_id
+                            FROM columns
+                            WHERE type = 'numerical'
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
 
-                // console.log(tables);
+                            INTERSECT 
+                            
+                            SELECT table_id
+                            FROM columns
+                            WHERE type = 'text'
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
+                        )
+                        AND col.type = 'numerical' 
+                        AND c.location != 'header'
+                        AND c.value != ''
+                        GROUP BY table_id, col_id
+                        HAVING T_TEST(?, toArr(value)) > ?
+                        AND SEM(toArr(value)) < ?;
+                    `)
 
-                var cMap;
-                try {
-                    Object.keys(tables).forEach(table_id => {
-                        cMap = this.getColumnMapping(table_id, tables[table_id])
-                    })
-                } catch (error) {
-                    console.log(err);
+                    this.all(stmt,
+                        [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]],
+                        results[i])
                 }
-                
-                resolve(sortedTables);
 
-            } catch(error) {
-                console.log(error);
-                reject(error)
+                var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
+                union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
+
+                var tables = [];
+                var cols = [];
+                var curChiTestStat;
+                var bestPerm;
+                var idPerms;
+                var idPerm;
+                var pValDP = [];
+
+                for (let i = 0; i < numNumerical; i++)
+                    pValDP.push([])
+
+                if (typeof union === "undefined") {
+                    resolve([]) // No results for numerical columns
+                } else {
+                    /* Get the best permutation for numerical columns for each table */
+                    for (const table_id of union) {
+                        cols = [];
+                        stmt = this.db.prepare(`
+                            SELECT table_id, col_id, toArr(value) AS column
+                            FROM cells c NATURAL JOIN columns col
+                            WHERE col.type = 'numerical'
+                            AND c.location != 'header'
+                            AND table_id = ?
+                            GROUP BY table_id, col_id
+                        `)
+
+                        this.all(stmt, [table_id], cols)
+
+                        /* 'refine' result of query */
+                        cols = {
+                            table_id: table_id,
+                            columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
+                            colIDs: cols.map(res => res['col_id'])
+                        }
+
+                        /* Re-initialize dynamic programming array */
+                        pValDP = []
+                        for (let i = 0; i < numNumerical; i++) {
+                            pValDP[i] = [];
+                            for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                                pValDP[i].push(-1)
+                            }
+                        }
+
+                        bestPerm = {
+                            table_id: table_id,
+                            numericalPerm: [],
+                            chiTestStat: Infinity,
+                        };
+
+                        curChiTestStat = 0;
+                        idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
+
+                        /* Iterate over all permutations of the columns, 
+                         * finding the one that returns the lowest cumulative p-value */
+                        combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
+                            idPerm = idPerms.next();
+                            curChiTestStat = 0;
+
+                            /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
+                            ssCols.forEach((col, index) => {
+                                /* If haven't calculated matching, fill dp array */
+                                if (pValDP[index][idPerm[index]] < 0) {
+                                    /* Map p-values between 0.1 and 1 to avoid log(0) */
+                                    if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
+                                        pValDP[index][idPerm[index]] = Math.log(0.98 * (Number(col[0] === perm[index][0])) + 0.01)
+                                    else
+                                        pValDP[index][idPerm[index]] = Math.log(this.ttestCases(col, perm[index])) // Low p-values are bad
+                                }
+
+                                curChiTestStat += pValDP[index][idPerm[index]]
+                            })
+
+                            curChiTestStat *= -2;
+
+                            if (curChiTestStat < bestPerm['chiTestStat']) {
+                                bestPerm['numericalPerm'] = idPerm;
+                                bestPerm['chiTestStat'] = curChiTestStat
+                            }
+                        })
+
+                        tables.push(bestPerm)
+                    }
+                }
+
+                resolve(tables);
+            } catch (error) {
+                reject(error);
             }
-
         })
     }
 
-    getColumnMapping(table_id, rowIDs) {
-        /* Gets the column mapping of the table with id 'table_id'
-         * to the current state of the seed set. The column mapping
-         * is defined as follows: For each row in the table
-         * which has been found to match a row in the seed set
-         * there is a number of possible orderings of the columns 
-         * to convert that row into the row in the seed set. We find
-         * these possible orderings, and the column mapping is the most common one.
+    getTextualMatches(tables) {
+        /* Gets the texutal matches and permutes the columns for all
+         * textual seed set columns. If there is at least one numerical column in 
+         * the seed set, then we use the tables found in the 
+         * previous step (getNumericalMatches). Otherwise, we search through the database
+         * for all tables with # of textual columns >= # of textual columns in the seed set, and
+         * perform the same operations with those.
          * 
          * Arguments:
-         * - table_id, the ID of the table to test
+         * - results: The results of getNumericalMatches
          * 
          * Returns:
-         * - object containing the column mapping from the table
-         *   to our seed set, the related score, and the row mapping
-         */
+         * - Promise that resolves if querying is successful, rejects otherwise */
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var sliderIndices = [];
+        var MinRelThresh = 0.4;
+        var curCumProbs = [];
+        var ssCols = [];
+        var pValDP = [];
+        var cols = [];
+        var idPerms;
+        var column;
+        var idPerm;
+        var pass;
+        var stmt;
 
-        var rowStr = [];
-        for (const row of rowIDs) {
-            rowStr.push(row);
+        for (let i = 0; i < this.seedSet['types'].length; i++) {
+            if (this.seedSet['types'][i] !== 'text')
+                continue
+
+            ssCols.push([])
+            column = ssCols[ssCols.length - 1]
+            for (let j = 0; j < rows.length; j++) {
+                if (rows[j][i] !== "NULL")
+                    column.push(rows[j][i])
+            }
         }
-        rowIDs = `(${rowStr.join(', ')})`
 
-        var mappings;
-        var mappingCounts = [];
-        for (const row of this.seedSet['rows']) {
-            var customTable = this.makeTempTable(row.split(' || '))
-            
-            const stmt = this.db.prepare(`
-            WITH origin AS ${customTable}
-            SELECT GROUP_CONCAT(cols, ' || ') AS mapping
-            FROM (
-                SELECT table_id, row_id, word, GROUP_CONCAT(c.col_id, ', ') AS cols
-                FROM cells c, origin
-                WHERE table_id = ${table_id}
-                AND row_id IN ${rowIDs}
-                AND c.col_id > 0
-                AND leven(origin.word, c.value) < origin.edit_limit
-                GROUP BY table_id, row_id, word
-                )
-                GROUP BY table_id, row_id
-            `)
-            mappings = [];
-            this.all(stmt, [], mappings)
-            .then(() => {
-                if (mappings.length > 0) {
-                    console.log(mappings)
-                    mappings = mappings.map(mapping => mapping.split(' || ').map(cols => cols.split(', '))) // Undoes the above GROUP_CONCATs
-                    console.log(mappings)
-                    
-                    /* Count most frequent column mapping for each column */
-                    for (const row of mappings) {
-                        for (let i = 0; i < row.length; i++) {
-                            for (let j = 0; j < row[i].length; j++) {
-                                if (typeof mappingCounts[i] === 'undefined') {
-                                    mappingCounts[i] = { };
-                                }
-                                if (mappingCounts[i][row[i][j]]) mappingCounts[i][row[i][j]]++;
-                                else mappingCounts[i][row[i][j]] = 1;
-                            }
+        this.seedSet['types'].forEach((type, i) => {
+            if (type === 'text') {
+                sliderIndices.push(this.seedSet['sliders'][i])
+            }
+        })
+
+        for (let i = 0; i < sliderIndices.length; i++)
+            pValDP.push([])
+
+        return new Promise((resolve, reject) => {
+            try {
+                /* No numerical in seed set, look through all textual columns */
+                if (this.seedSet['types'].filter(type => type === 'numerical').length === 0) {
+
+                    // Does the first DISTINCT slow things down?
+                    stmt = this.db.prepare(`
+                        SELECT table_id
+                        FROM columns
+                        WHERE type = 'text'
+                        AND table_id NOT IN (
+                            SELECT DISTINCT table_id
+                            FROM columns
+                            WHERE type = 'numerical'
+                        )
+                        GROUP BY table_id
+                        HAVING COUNT(DISTINCT col_id) >= ?;
+                    `)
+
+                    this.all(stmt, [numTextual], tables)
+
+                    for (let i = 0; i < tables.length; i++) {
+                        tables[i]['numericalPerm'] = [];
+                        tables[i]['chiTestStat'] = 0;
+                    }
+
+                } else if (tables.length === 0) {
+                    /* No numerical columns satisfy the slider value */
+                    resolve([])
+                }
+
+                for (let i = 0, table; i < tables.length; i++) {
+                    table = tables[i]
+                    cols = [];
+                    stmt = this.db.prepare(`
+                        SELECT table_id, col_id, toArr(value) AS column
+                        FROM cells c NATURAL JOIN columns col
+                        WHERE col.type = 'text'
+                        AND c.location != 'header'
+                        AND table_id = ?
+                        GROUP BY table_id, col_id
+                    `)
+
+                    this.all(stmt, [table['table_id']], cols)
+
+                    /* 'refine' result of query */
+                    cols = {
+                        table_id: table['table_id'],
+                        columns: cols.map(res => JSON.parse(res['column'])),
+                        colIDs: cols.map(res => res['col_id'])
+                    }
+
+                    /* Re-initialize dynamic programming array */
+                    pValDP = []
+                    for (let i = 0; i < sliderIndices.length; i++) {
+                        pValDP[i] = [];
+                        for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
+                            pValDP[i].push(-1)
                         }
                     }
 
+                    table['textualPerm'] = []
+                    table['textScore'] = -1;
 
-                    var colMap = [];
-                    for (const count of mappingCounts) {
-                        var max = Object.keys(count).sort((i, j) => count[j] -  count[i])[0]
-                        colMap.push(max);
-                    }
+                    idPerms = combinatorics.permutation(cols['colIDs'], numTextual)
 
-                    return colMap
+                    /* Iterate over all permutations of the columns, 
+                    * finding the one that returns the lowest cumulative p-value */
+                    combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
+                        idPerm = idPerms.next();
+                        curCumProbs = [];
+
+                        ssCols.forEach((col, index) => {
+                            /* If haven't calculated matching, fill dp array */
+                            if (pValDP[index][idPerm[index]] < 0) {
+                                /* Set intersection
+                                 * https://exploringjs.com/impatient-js/ch_sets.html#missing-set-operations
+                                 * Accessed July 6th, 2020 */
+                                const permSet = new Set([...perm[index]]);
+                                pValDP[index][idPerm[index]] = new Set(col.filter(x => permSet.has(x))).size / col.length
+                            }
+
+                            curCumProbs.push(pValDP[index][idPerm[index]])
+                        })
+
+                        pass = curCumProbs.every((val, i) => val > Math.max(sliderIndices[i] / 100, MinRelThresh))
+
+                        curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
+
+                        if (pass && curCumProbs > table['textScore']) {
+                            table['textualPerm'] = idPerm;
+                            table['textScore'] = curCumProbs
+                        }
+                    })
+
+                    if (table['textualPerm'].length === 0)
+                        tables.splice(i--, 1)
+
+                    /* Set a 'base score' for the table to be used when ranking rows */
+                    else
+                        table['score'] = table['chiTestStat'] + table['textScore']
 
                 }
-            })
-            .catch((err) => {
-                console.log(err, mappings)
-                return null;
-            })
-        }
+
+                resolve(tables)
+            } catch (error) {
+                reject(error)
+            }
+        })
+    }
+
+    getPermutedRows(tables) {
+        /* Retrieves the rows of the tables found in the previous step,
+         * permuted to the 'best' possible permutations found in 
+         * getNumericalMatches() and getTextualMatches()
+         * 
+         * Arguments:
+         * - tables: The results of getNumericalMatches & getTextualMatches
+         * 
+         * Returns:
+         * - Promise which resolves if querying is successful, Rejects otherwise
+         */
+        var cases;
+        var stmt;
+
+        return new Promise((resolve, reject) => {
+            try {
+                var nP = 0;
+                var tP = 0;
+
+                for (let table of tables) {
+                    table['rows'] = [];
+
+                    // Create custom CASE statement for col_id for ordering of columns based on ideal permutations
+                    var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
+                    nP = 0;
+                    tP = 0;
+                    cases = "";
+
+                    for (let i = 0; i < this.seedSet['types'].length; i++) {
+                        if (this.seedSet['types'][i] === 'text')
+                            cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
+                        else
+                            cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
+                    }
+
+                    // Columns that are not in the column range of the seed set are ignored.
+                    cases += `ELSE ${ignoredCols}`
+
+                    stmt = this.db.prepare(`
+                        SELECT GROUP_CONCAT(value, ' || ') AS value
+                        FROM
+                        (
+                            SELECT table_id, row_id, CASE col_id ${cases} END AS col_order, value
+                            FROM cells c
+                            WHERE table_id = ?
+                            AND c.location != 'header'
+                            ORDER BY table_id, row_id, col_order, value ASC
+                        )
+                        WHERE col_order != ?
+                        GROUP BY table_id, row_id
+                    `)
+
+                    this.all(stmt, [table['table_id'], ignoredCols], table['rows'])
+
+                    table['rows'] = table['rows'].map(res => { return res['value'] })
+                }
+
+                resolve(tables)
+            } catch (error) {
+                reject(error)
+            }
+        })
+    }
+
+    rankResults(tables) {
+        /* Ranks the results that are gotten from getTextualMatches
+         * by comparing each potential row with each row in the seed set, giving
+         * that comparison a score, then averaging the scores across seed set rows
+         * returns the 10 best
+         * 
+         * Arguments:
+         * - results: an array of rows from the tables that were identified to fit best with the data
+         * 
+         * Returns:
+         * - Promise which resolves if ranking is successful, rejects otherwise */
+
+        var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
+        var results = [];
+        var score = 0;
+
+        return new Promise((resolve, reject) => {
+            try {
+                for (let table of tables) {
+                    for (let tableRow of table['rows']) {
+                        score = table['score'];
+                        tableRow = tableRow.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
+                        for (let row of rows) {
+                            for (let i = 0; i < row.length; i++) {
+                                if (!isNaN(row[i]) && !isNaN(tableRow[i]))
+                                    score += Math.pow(row[i] - tableRow[i], 2)
+                                             * (100 - this.seedSet['sliders'][i])
+                                else {
+                                    score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2)
+                                             * (100 - this.seedSet['sliders'][i])
+                                }
+                            }
+                        }
+
+                        results.push({
+                            row: tableRow.join(' || '),
+                            score: score,
+                        })
+                    }
+                }
+
+                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
+
+                results = results.slice(0, 10).map(res => { return res['row'] })
+
+
+                resolve(results)
+            } catch (error) {
+                console.log(error)
+                reject(error)
+            }
+        })
     }
 
     all(stmt, params = [], results) {
@@ -532,31 +934,94 @@ class Database {
             try {
                 const rows = stmt.all(params)
                 rows.forEach((row) => {
+                    // Set empty cells to be 'NULL'
+                    if (typeof row['value'] !== 'undefined')
+                        row['value'] = row['value'].split(' || ').map(cell => cell.length === 0 ? "NULL" : cell).join(' || ')
+
                     results.push(row);
                 })
                 res();
             } catch (error) {
-                console.log(err);
+                console.log(error);
                 rej(error)
             }
         })
     }
 
-    makeTempTable(splitRow) {
-        /* Converts the row into a temporary table (combination of 'SELECT's and 'UNION ALL's)
+    fillNulls(table) {
+        /* Pad each row with NULL until the table is a rectangle 
          * 
          * Arguments:
-         * - splitRow: The row to make into a temporary table, represented as an array of cells
+         * - table: The table we want to pad with NULLs
          * 
          * Returns:
-         * - customTable: a string representing a temporary table, with each row being a cell
-         * from 'splitRow' and the corresponding slider value
-         */
-        var customTable = [];
-        for (let i = 1; i < splitRow.length; i++) {
-            customTable.push(`SELECT '${splitRow[i]}' AS word, ${this.seedSet['sliders'][i]} AS edit_limit`)
-         }
-        return `(${customTable.join(' UNION ALL ')})`
+         * - undefined, since we modify table in place*/
+        var row;
+        for (let i = 0; i < table.length; i++) {
+            row = table[i].split(' || ')
+            for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
+            table[i] = row.join(' || ')
+        }
+    }
+
+    getTypes(table) {
+        /* Gets the type of each column in 'table'. 
+         * If every cell is a number, it is labelled as 'number'
+         * Otherwise, it is of type 'text'
+         * 
+         * Assumes table has at least one row
+         * 
+         * Arguments:
+         * - table: The table for which column types will be found
+         * 
+         * Returns:
+         * - An array of dtypes */
+
+        var types = [];
+        var column = [];
+        var rows = table.map(row => row.split(' || '))
+
+        for (let i = 0; i < rows[0].length; i++) {
+            for (let j = 0; j < rows.length; j++) {
+                if (rows[j][i] !== "NULL")
+                    column.push(rows[j][i])
+            }
+
+            column = column.map(value => isNaN(value));
+
+            if (column.indexOf(true) === -1 && column.length > 0)
+                types.push("numerical")
+            else
+                types.push("text");
+        }
+
+        return types
+    }
+
+    ttestCases(arr1, arr2) {
+        /* Handles the different cases of the t-test, 
+         * returning the p-value in each case 
+         * 
+         * Arguments:
+         * - arr1, arr2: the two arrays to use the t-test with
+         * 
+         * Returns:
+         * - p-value of the t-test */
+
+        var p = null;
+        if (arr1.length === 0 || arr2.length === 0)
+            return 0 // Lowest p-value possible => worst result (want the best match)
+
+        if (arr1.length === 1 && arr2.length === 1)
+            p = Number(arr1[0] === arr2[0])
+
+        /* If only one row in seedSet's numerical col, use one-sample t-test */
+        else if (arr1.length === 1)
+            p = Number(ttest(arr2, { mu: arr1[0] }).pValue())
+        else
+            p = Number(ttest(arr1, arr2).pValue())
+
+        return p
     }
 
     makeStrArr(str) {
@@ -581,7 +1046,7 @@ class Database {
     getQMarks(arr) {
         /* Since the SQL engine uses '?' placeholders in order to format the query,
          * this function determines the number of question marks based on the number
-         * of arguments passed to the query.
+         * of arguments passed to the query (arr).
          * 
          * Arguments:
          * - arr: The array which will be passed to the query engine
@@ -604,8 +1069,21 @@ class Database {
             })
             qMarks = `(${qMarks.join(', ')})`;
         }
-        
+
         return qMarks
+    }
+
+    swap(arr, i, j) {
+        /* Swaps the elements at indices i, j in arr
+         * 
+         * Arguments:
+         * - arr: The array in which to swap elements
+         * - i,j: The indices of the elements to be swapped
+         * 
+         */
+        var tmp = arr[i]
+        arr[i] = arr[j];
+        arr[j] = tmp;
     }
 
     close() {
@@ -618,12 +1096,83 @@ class Database {
 module.exports = Database;
 
 /*
-    TEST QUERIES: RUN IN TERMINAL   
+    TEST QUERIES: RUN IN TERMINAL
 
-    db.prepare(`
-    SELECT *
-    FROM cells
-    WHERE dice(value, '1982') >= 0.8;
+    db.aggregate('toArr', {
+        start: () => [],
+        step: (array, nextValue) => {
+            array.push(nextValue);
+        },
+        result: array => JSON.stringify(array)
+    });
 
-    `).all();
+
+
+    SELECT table_id, row_id, col_id, value
+    FROM cells c NATURAL JOIN types
+    WHERE t.type = 'numerical
+    AND c.location != 'header'
+    GROUP BY table_id, col_id
+    HAVING (something about T_TEST)
+*/
+
+/*
+    UNUSED FUNCTIONS
+
+        getRelatedTables() {
+        /* 'key' refers to primary key, LH column.
+         *
+         * Get titles of the tables with rows
+         * currently in the seed set.
+         *
+         * Find similar titles (HOW)
+         * Try:
+         *      - Dice
+         *      - Levenshtein
+         *      - Jaro-Winkler
+         *
+         // END COMMENT
+        var results = [];
+        var limit = 1.0;
+        var prom;
+
+        return new Promise((resolve, reject) => {
+            do {
+                const stmt = this.db.prepare(`
+                    WITH currentTitles AS (
+                        SELECT table_id, title
+                        FROM titles
+                        WHERE table_id in (${this.seedSet['table_ids']})
+                    )
+                    SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
+                    FROM titles t, currentTitles c
+                    WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
+                    AND
+                    (
+                        (dice(c.title, t.title) >= ${limit})
+                    );
+                `)
+                prom = this.all(stmt, [], results)
+                limit -= 0.05;
+            } while ( new Set(results.map(result => result['title'])).size <= 1 ); // At least two unique tables in results
+            prom
+            .then(() => {
+                console.log(results, limit)
+                resolve(results);
+            })
+            .catch((error) => {
+                reject(error);
+            })
+        });
+    }
+
+        this.db.function('sameType', (cVal, ssVal) => Number(isNaN(cVal) === isNaN(ssVal)))
+
+        this.db.function('proximity', (cVal, ssVal) => {
+            if (!isNaN(ssVal))
+                return Math.abs(Number(cVal) - Number(ssVal))
+            else
+                return jaroSim(cVal, ssVal)
+        });
+
 */

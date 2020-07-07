@@ -2,16 +2,17 @@
     <div>
         <div class="separate-components centering">
             <Logo />
-            <button @click="goBack">Click to return to Keyword Search</button>
-        </div>
-
-        <!--  -->
-        <div class="separate-components centering">
-            <h4>Please select one of the operations below</h4>
-            <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
-            <button v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
-                Click to perform operation
-            </button>
+            <Instruction ref="instruction-1" index="1">
+                <template #hidden>
+                    <p>
+                        This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
+                        in the previous section and find different rows in the database that match the seed set, based on parameters that you choose.
+                    </p>
+                </template>
+            </Instruction>
+            <button @click="showInstructions" style="margin-bottom:1%;">Learn about Part 2 of BareTQL</button> <br>
+     
+            <button @click="goBack">Return to Keyword Search</button>
         </div>
         <div class="separate-components centering">
             <h3>Current Table: {{ table.length }} rows, {{ numCols }} columns, {{ nullCount }} null values</h3>
@@ -21,24 +22,75 @@
             </div>
 
             <!-- Deletion buttons, Sliders -->
+            <Instruction ref="instruction-3" index="3">
+                <template #hidden>
+                    <p>
+                        These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
+                        how similar you want the expanded rows to be for that column. 100% means only choose values that are currently in the column, 
+                        0% means we can choose any values, and anything in between is a proportion of each.
+                    </p>
+                </template>
+            </Instruction>
+            <Instruction ref="instruction-4" index="4">
+                <template #hidden>
+                    <p>
+                        You can also delete a column by clicking on the 'delete column' button above each one. <br> 
+                        You can delete more than one column at the same time, as you will be prompted before the deletion will occur.
+                    </p>
+                </template>
+            </Instruction>
             <table>
                 <tbody>
                     <tr>
-                        <td style="border: none;" v-for="col in numCols" :key="col">
-                            <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
-                            <label :for="'delete'+col">Delete Column</label>
-                        </td>
-                    </tr>
-                    <tr>
                         <td v-for="col in numCols" :key="col">
-                            <p class="slider-values">{{ sliderValues[col - 1] }}%</p>
+                            <div style="text-align: left;">
+                                <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
+                                <label :for="'delete'+col" style="padding: 1%">X</label>
+                            </div>
+                            <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
                     </tr>
                 </tbody>
             </table>
-            <UserTable :table="table" />
+            <Instruction ref="instruction-5" index="5">
 
+                <template #hidden>
+                    <p>
+                        These are the values of your seed set. If you want to swap values, simply click on the values
+                        you want to swap and a button will appear that will allow you to swap. 
+                    </p>
+                </template>
+            </Instruction>
+            <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
+
+            <Instruction ref="instruction-2" index="2">
+                <template #hidden>
+                    <p>
+                        These are the operations with which you can expand your seed set. <br>
+                        XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
+                    </p>
+                </template>
+            </Instruction>
+            <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
+            <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
+                Confirm Selection
+            </button>
+
+        </div>
+
+        <!-- User Operations
+        <div class="separate-components centering">
+
+        </div> -->
+        
+        <!-- Result of Set Expansion -->
+        <div class="separate-components centering">
+            <h2>Result of Set Expansion</h2>
+            <hr style="width: 80%;">
+            <h3 v-if="expandedRows !== null">Expanded Rows: {{ expandedRows.length }} rows found</h3>
+            <h4 v-else>No operation selected</h4>
+            <UserTable :table="expandedRows" :allowSelecton="false" />
         </div>
     </div>
 </template>
@@ -48,6 +100,7 @@ import Logo from './Logo.vue'
 import ButtonList from './ButtonList.vue'
 import UserTable from './UserTable.vue'
 import ResultService from '../getResults'
+import Instruction from './Instruction.vue'
 
 export default {
     name: 'Operations',
@@ -55,6 +108,7 @@ export default {
         Logo,
         ButtonList,
         UserTable,
+        Instruction,
     },
 
     data: function() {
@@ -68,26 +122,55 @@ export default {
             dotOp: "",
             nullCount: 0,
             table: [],
+            expandedRows: null,
             deletions: [],
             sliderValues: [],
+            document: document,
         }
     },
 
     methods: {
-        executeDotOp: function() {
+        async showInstructions() {
+            /* Shows the 'slideshow' of Instruction components */
+            var inputButtons = this.document.querySelectorAll("button:not(.instruction-button), input, labels")
+            for (let inp of Object.values(inputButtons)) {inp.disabled = true; inp.classList.toggle('deactivate')}
+
+            for (let i = 1; i < document.querySelectorAll('.instruction-component').length + 1; i++) {
+                await this.$refs[`instruction-${i}`].handleClick();
+            }
+
+            for (let inp of Object.values(inputButtons)) {inp.disabled = false; inp.classList.toggle('deactivate')}
+        },
+
+        executeDotOp() {
+            /* Executes the dot op selected by user */
+            var changeButton = function(button, content) {
+                button.textContent = content;
+                button.disabled = !button.disabled;
+                button.classList.toggle('deactivate');
+            }
+
+            // this.expandedRows = [];
+
+            var submitButton = this.document.querySelector("#dot-op-submit")
+            changeButton(submitButton, "Loading Results...")
+            
             ResultService.handleDotOps(this.dotOp, this.sliderValues)
             .then((data) => {
-                this.handleResponse(data);
+                changeButton(submitButton, "Click to perform operation")
+                this.expandedRows = this.handleResponse(data);
             })
             .catch((err) => {
+                changeButton(submitButton, "An error occurred. Please try again")
                 console.log(err);
             })
         },
 
-        deleteCols: function() {
+        deleteCols() {
+            /* Deletes all columns that the user has selected */
             ResultService.deleteCols(this.deletions)
             .then((data) => {
-                this.handleResponse(data)
+                this.table = this.handleResponse(data, true)
                 this.deletions = [];
             })
             .catch((err) => {
@@ -95,35 +178,51 @@ export default {
             })
         },
 
-        handleResponse: function(data) {
+        handleResponse(data, seedSet = false) {
+            /* handles the response from the API when receiving a modified seed set */
             var cellCount = 0;
-            this.table = [];
+            var tmp = [];
             this.numCols = 0;
             this.sliderValues = []
 
             for (let i = 0; i < data['sliders'].length; i++) {
-                this.sliderValues.push(Number(data['sliders'][i]) * 5);
+                this.sliderValues.push(Number(data['sliders'][i]));
             }
 
             data = data['rows']
 
-            if (data[0].length > 0) {
+            if (data.length > 0 && data[0].length > 0) {
                 data.forEach(row => {
-                    row = row.split(' || ') // Hardcoded split, from getResults.js in 'handleResponse'
+                    row = row.split(' || ')
                     cellCount += row.length;
                     this.numCols = Math.max(this.numCols, row.length);
     
-                    this.table.push(row) 
+                    tmp.push(row) 
                 });
             }
 
-            this.nullCount = this.table.length * this.numCols - cellCount
+            if (seedSet) 
+                this.nullCount = tmp.length * this.numCols - cellCount
+            return tmp
         },
-        changeOp: function(newOp) {
+        changeOp(newOp) {
+            /* Changes the operation, activated from ButtonList emission */
             this.dotOp = newOp;
         },
 
-        goBack: function() {
+        swapCells(indices) {
+            /* Swaps the two cells selected by the user */
+            ResultService.swapCells(indices)
+            .then((data) => {
+                this.table = this.handleResponse(data, true);
+            })
+            .catch((err) => {
+                console.log(err);
+            })
+        },
+
+        goBack() {
+            /* Emits a function to change the screen back to keyword search */
             this.$emit('ChangeMode')
         },
 
@@ -138,17 +237,19 @@ export default {
     },
 
 
-    created: function() {
+    created() {
+        /* Initial call to get the Seed Set from the API */
         ResultService.handleDotOps(undefined, this.sliderValues)
         .then((data) => {
-            this.handleResponse(data);
+            this.table = this.handleResponse(data, true);
         })
         .catch((err) => {
             console.log(err);
         })
     },
 
-    updated: function() {
+    updated() {
+        /* Adjusts number of columns when table is updated */
         this.table.forEach(row => {
             this.numCols = Math.max(row.length, this.numCols)
         })
@@ -157,7 +258,7 @@ export default {
 </script>
 
 
-<style  scoped>
+<style scoped>
 
 
 .compress {
