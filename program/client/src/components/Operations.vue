@@ -47,7 +47,7 @@
                                 <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
                                 <label :for="'delete'+col" style="padding: 1%">X</label>
                             </div>
-                            <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Diverse</p>
+                            <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
                             <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
                         </td>
                     </tr>

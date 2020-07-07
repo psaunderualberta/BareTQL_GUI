@@ -764,6 +764,9 @@ class Database {
                         ssCols.forEach((col, index) => {
                             /* If haven't calculated matching, fill dp array */
                             if (pValDP[index][idPerm[index]] < 0) {
+                                /* Set intersection
+                                 * https://exploringjs.com/impatient-js/ch_sets.html#missing-set-operations
+                                 * Accessed July 6th, 2020 */
                                 const permSet = new Set([...perm[index]]);
                                 pValDP[index][idPerm[index]] = new Set(col.filter(x => permSet.has(x))).size / col.length
                             }
@@ -773,7 +776,9 @@ class Database {
 
                         pass = curCumProbs.every((val, i) => val > Math.max(sliderIndices[i] / 100, MinRelThresh))
 
-                        if (pass && curCumProbs.reduce((a, b) => a + b, 0) > table['textScore']) {
+                        curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
+
+                        if (pass && curCumProbs > table['textScore']) {
                             table['textualPerm'] = idPerm;
                             table['textScore'] = curCumProbs
                         }
@@ -781,6 +786,7 @@ class Database {
 
                     if (table['textualPerm'].length === 0)
                         tables.splice(i--, 1)
+
                     /* Set a 'base score' for the table to be used when ranking rows */
                     else
                         table['score'] = table['chiTestStat'] + table['textScore']
@@ -883,9 +889,11 @@ class Database {
                         for (let row of rows) {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
-                                    score += Math.pow(row[i] - tableRow[i], 2) * (100 - this.seedSet['sliders'][i])
+                                    score += Math.pow(row[i] - tableRow[i], 2)
+                                             * (100 - this.seedSet['sliders'][i])
                                 else {
-                                    score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2) * (100 - this.seedSet['sliders'][i])
+                                    score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2)
+                                             * (100 - this.seedSet['sliders'][i])
                                 }
                             }
                         }
@@ -900,6 +908,7 @@ class Database {
                 results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
 
                 results = results.slice(0, 10).map(res => { return res['row'] })
+
 
                 resolve(results)
             } catch (error) {
