@@ -219,8 +219,8 @@ class ResultService {
         var rankedTables = [];
         var engine = bm25();
         
-        // /* Handle the case of 1 query result separately */
-        if (Object.keys(tables).length <= 1) {
+        /* Wink-BM25() requries at least 3 results (tables) */
+        if (Object.keys(tables).length < 3) {
             Object.keys(tables).forEach(id => {
                 rankedTables.push({
                     table_id: id,

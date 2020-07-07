@@ -542,7 +542,7 @@ class Database {
                     `)
 
                     this.all(stmt,
-                        [numNumerical, numTextual, column, (1 - this.seedSet['sliders'][i] / 100), this.seedSet['sliders'][i]],
+                        [numNumerical, numTextual, column, (this.seedSet['sliders'][i] / 100), 100 - this.seedSet['sliders'][i]],
                         results[i])
                 }
 
@@ -593,6 +593,16 @@ class Database {
                             }
                         }
 
+                        /* Fill DP array */
+                        for (let i = 0; i < ssCols.length; i++) {
+                            cols['columns'].forEach((col, j) => {
+                                if (statistics.standardDeviation(ssCols[i]) === 0 && statistics.standardDeviation(col) === 0)
+                                    pValDP[i][cols['colIDs'][j]] = Math.log(0.98 * (Number(ssCols[i][0] === col[0])) + 0.01)
+                                else
+                                    pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col)) // Low p-values are bad
+                            })
+                        }
+
                         bestPerm = {
                             table_id: table_id,
                             numericalPerm: [],
@@ -608,19 +618,9 @@ class Database {
                             idPerm = idPerms.next();
                             curChiTestStat = 0;
 
-                            /* Emphasises 0s at the front (can be seen when querying first 2 rows of 'aircraft carriers')*/
-                            ssCols.forEach((col, index) => {
-                                /* If haven't calculated matching, fill dp array */
-                                if (pValDP[index][idPerm[index]] < 0) {
-                                    /* Map p-values between 0.1 and 1 to avoid log(0) */
-                                    if (statistics.standardDeviation(col) === 0 && statistics.standardDeviation(perm[index]) === 0)
-                                        pValDP[index][idPerm[index]] = Math.log(0.98 * (Number(col[0] === perm[index][0])) + 0.01)
-                                    else
-                                        pValDP[index][idPerm[index]] = Math.log(this.ttestCases(col, perm[index])) // Low p-values are bad
-                                }
-
-                                curChiTestStat += pValDP[index][idPerm[index]]
-                            })
+                            for (let i = 0; i < ssCols.length; i++) {
+                                curChiTestStat += pValDP[i][idPerm[i]]
+                            }
 
                             curChiTestStat *= -2;
 
@@ -657,11 +657,12 @@ class Database {
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
-        var MinRelThresh = 0.4;
+        var minRelThresh = 0.4;
         var curCumProbs = [];
         var ssCols = [];
         var pValDP = [];
         var cols = [];
+        var permSet;
         var idPerms;
         var column;
         var idPerm;
@@ -715,6 +716,8 @@ class Database {
                         tables[i]['chiTestStat'] = 0;
                     }
 
+                    console.log(tables.length)
+
                 } else if (tables.length === 0) {
                     /* No numerical columns satisfy the slider value */
                     resolve([])
@@ -750,6 +753,16 @@ class Database {
                         }
                     }
 
+                    // Fill DP array
+                    for (let i = 0; i < ssCols.length; i++) {
+                        cols['columns'].forEach((col, j) => {
+                            permSet = new Set([...col]);
+                            pValDP[i][cols['colIDs'][j]] = new Set(col.filter(x => permSet.has(x))).size / ssCols[i].length
+                        })
+                    }
+
+                    console.log(i, tables.length, cols['colIDs'])
+
                     table['textualPerm'] = []
                     table['textScore'] = -1;
 
@@ -761,21 +774,11 @@ class Database {
                         idPerm = idPerms.next();
                         curCumProbs = [];
 
-                        ssCols.forEach((col, index) => {
-                            /* If haven't calculated matching, fill dp array */
-                            if (pValDP[index][idPerm[index]] < 0) {
-                                /* Set intersection
-                                 * https://exploringjs.com/impatient-js/ch_sets.html#missing-set-operations
-                                 * Accessed July 6th, 2020 */
-                                const permSet = new Set([...perm[index]]);
-                                pValDP[index][idPerm[index]] = new Set(col.filter(x => permSet.has(x))).size / col.length
-                            }
+                        for (let i = 0; i < cols.length; i++) {
+                            curCumProbs.push(pValDP[i][idPerm[i]])
+                        }
 
-                            curCumProbs.push(pValDP[index][idPerm[index]])
-                        })
-
-                        pass = curCumProbs.every((val, i) => val > Math.max(sliderIndices[i] / 100, MinRelThresh))
-
+                        pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
                         curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
 
                         if (pass && curCumProbs > table['textScore']) {
@@ -890,10 +893,10 @@ class Database {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
                                     score += Math.pow(row[i] - tableRow[i], 2)
-                                             * (100 - this.seedSet['sliders'][i])
+                                             * (this.seedSet['sliders'][i])
                                 else {
                                     score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2)
-                                             * (100 - this.seedSet['sliders'][i])
+                                             * (this.seedSet['sliders'][i])
                                 }
                             }
                         }
@@ -918,7 +921,7 @@ class Database {
         })
     }
 
-    all(stmt, params = [], results) {
+    all(stmt, params, results) {
         /* Custom definition of db.all used to work with
          * our use of promises.
          * 
@@ -1008,7 +1011,7 @@ class Database {
          * Returns:
          * - p-value of the t-test */
 
-        var p = null;
+        var p;
         if (arr1.length === 0 || arr2.length === 0)
             return 0 // Lowest p-value possible => worst result (want the best match)
 
@@ -1052,7 +1055,7 @@ class Database {
          * - arr: The array which will be passed to the query engine
          * 
          * Returns:
-         * - An array of '?', with length equal to the length of 'arr'
+         * - A string of the format "(?, ?, ..., ?)" with # of '?' equal to the length of 'arr'
          */
         if (typeof arr === 'undefined') {
             return ''
