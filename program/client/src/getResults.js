@@ -219,8 +219,8 @@ class ResultService {
         var rankedTables = [];
         var engine = bm25();
         
-        // /* Handle the case of 1 query result separately */
-        if (Object.keys(tables).length <= 1) {
+        /* Wink-BM25() requries at least 3 results (tables) */
+        if (Object.keys(tables).length < 3) {
             Object.keys(tables).forEach(id => {
                 rankedTables.push({
                     table_id: id,
@@ -231,8 +231,8 @@ class ResultService {
 
             // Preparatory tasks
             engine.defineConfig( { 
-                fldWeights: {title: 1, rows: 1},
-                bm25Params: {k1: 1.2, b: 0.3, k: 0.75}
+                fldWeights: {title: 5, rows: 1},
+                bm25Params: {k1: 1.2, b: 0.75, k: 1}
             });
     
             engine.definePrepTasks(pipe);
@@ -242,7 +242,7 @@ class ResultService {
             engine.consolidate()
     
             // Searching
-            let results = engine.search(keywords, 20)
+            let results = engine.search(keywords, 40)
     
             var id;
             var table;
