@@ -211,8 +211,7 @@ class Database {
 
         const stmt = this.db.prepare(` 
             SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, '${this.cellSep}') AS value
-            FROM cells 
-            WHERE (table_id, row_id) IN ${customTable}
+            FROM cells c NATURAL JOIN ${customTable}
             GROUP BY table_id, row_id
             ORDER BY table_id, row_id;
         `)
@@ -635,6 +634,8 @@ class Database {
                     }
                 }
 
+                console.log(tables.length)
+
                 resolve(tables);
             } catch (error) {
                 reject(error);
@@ -663,11 +664,8 @@ class Database {
         var ssCols = [];
         var pValDP = [];
         var cols = [];
-        var validTable;
         var permSet;
-        var idPerms;
         var column;
-        var idPerm;
         var pass;
         var stmt;
 
@@ -752,33 +750,38 @@ class Database {
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
                             permSet = new Set([...col]);
-                            pValDP[i][cols['colIDs'][j]] = new Set(col.filter(x => permSet.has(x))).size / ssCols[i].length
+                            pValDP[i][cols['colIDs'][j]] = new Set(ssCols[i].filter(value => permSet.has(value))).size / ssCols[i].length
                         })
                     }
-
-                    validTable = true;
 
                     table['textualPerm'] = []
                     table['textScore'] = 0;
 
+                    
+                    /* If the key column in the seed set has a successful mapping,
+                     * Iterate over all permutations of the columns, 
+                     * finding the one that returns the lowest cumulative p-value */
+                    var keyScores = pValDP.map(row => row.filter((cell, index) => index === 0)).flat()
+                    console.log(cols['table_id'], keyScores, sliderIndices[0] / 100, )
 
-                    /* Iterate over all permutations of the columns, 
-                    * finding the one that returns the lowest cumulative p-value */
-                    combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
-                        curCumProbs = [];
-
-                        for (let i = 0; i < cols.length; i++) {
-                            curCumProbs.push(pValDP[i][perm[i]])
-                        }
-
-                        pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
-                        curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
-
-                        if (pass && curCumProbs > table['textScore']) {
-                            table['textualPerm'] = perm;
-                            table['textScore'] = curCumProbs
-                        }
-                    })
+                    if (keyScores.some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
+                        combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
+                            console.log(perm)
+                            curCumProbs = [];
+    
+                            for (let i = 0; i < ssCols.length; i++) {
+                                curCumProbs.push(pValDP[i][perm[i]])
+                            }
+    
+                            pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
+                            curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
+    
+                            if (pass && curCumProbs > table['textScore']) {
+                                table['textualPerm'] = perm;
+                                table['textScore'] = curCumProbs
+                            }
+                        })
+                    }
 
                     if (table['textualPerm'].length === 0)
                         tables.splice(i--, 1)
