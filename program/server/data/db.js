@@ -83,6 +83,14 @@ class Database {
             return statistics.standardDeviation(arr) / (Math.sqrt(arr.length) + 1e-5) // Avoid division by 0
         })
 
+        this.db.function('OVERLAP_SIM', (ssCol, keyCol) => {
+            ssCol = JSON.parse(ssCol)
+            keyCol = JSON.parse(keyCol)
+
+            var colSet = new Set([...keyCol]);
+            return new Set(ssCol.filter(value => colSet.has(value))).size / ssCol.length
+        })
+
         this.db.function('isNumber', (num) => 1 - Number(isNaN(num)))
 
         // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
@@ -634,8 +642,6 @@ class Database {
                     }
                 }
 
-                console.log(tables.length)
-
                 resolve(tables);
             } catch (error) {
                 reject(error);
@@ -689,22 +695,30 @@ class Database {
             try {
                 /* No numerical in seed set, look through all textual columns */
                 if (this.seedSet['types'].filter(type => type === 'numerical').length === 0) {
+                    var ssKeyCol = JSON.stringify(ssCols[0])
 
-                    // Does the first DISTINCT slow things down?
                     stmt = this.db.prepare(`
                         SELECT table_id
-                        FROM columns
-                        WHERE type = 'text'
-                        AND table_id NOT IN (
-                            SELECT DISTINCT table_id
-                            FROM columns
-                            WHERE type = 'numerical'
+                        FROM columns NATURAL JOIN (
+                            SELECT table_id
+                            FROM cells NATURAL JOIN columns
+                            WHERE col_id = 0
+                            AND type = 'text'
+                            GROUP BY table_id
+                            HAVING OVERLAP_SIM(?, toArr(value)) >= ?
                         )
+                        WHERE type = 'text'
                         GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?;
+                        HAVING COUNT(DISTINCT col_id) >= ?
+                        
+                        EXCEPT
+                        
+                        SELECT table_id
+                        FROM columns
+                        WHERE type = 'numerical';
                     `)
 
-                    this.all(stmt, [numTextual], tables)
+                    this.all(stmt, [ssKeyCol, sliderIndices[0] / 100, numTextual], tables)
 
                     for (let i = 0; i < tables.length; i++) {
                         tables[i]['numericalPerm'] = [];
@@ -761,21 +775,19 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
                      * finding the one that returns the lowest cumulative p-value */
-                    var keyScores = pValDP.map(row => row.filter((cell, index) => index === 0)).flat()
-                    console.log(cols['table_id'], keyScores, sliderIndices[0] / 100, )
+                    var keyScores = pValDP[0]
 
                     if (keyScores.some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
-                            console.log(perm)
                             curCumProbs = [];
-    
+
                             for (let i = 0; i < ssCols.length; i++) {
                                 curCumProbs.push(pValDP[i][perm[i]])
                             }
-    
+
                             pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
                             curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
-    
+
                             if (pass && curCumProbs > table['textScore']) {
                                 table['textualPerm'] = perm;
                                 table['textScore'] = curCumProbs
@@ -813,8 +825,6 @@ class Database {
          */
         var cases;
         var stmt;
-
-        console.log(tables.length)
 
         return new Promise((resolve, reject) => {
             try {
