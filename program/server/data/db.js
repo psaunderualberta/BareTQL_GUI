@@ -26,7 +26,6 @@ class Database {
         try {
             this.db = new sqlite3(dbPath, {
                 readonly: true,
-                // verbose: console.log
             })
         } catch (error) {
             console.log(`Something went wrong with dbPath: ${dbPath}: ${error}`);
@@ -115,17 +114,18 @@ class Database {
          * locations on same table, leading to repeated rows in output
          */
         const stmt = this.db.prepare(`
-            SELECT DISTINCT r.table_id, title, row_id, value, rowCount
+            SELECT r.table_id, title, row_id, value, rowCount
             FROM
             (
-                SELECT DISTINCT t.table_id, t.title, c.row_id, value
-                FROM titles t NATURAL JOIN keywords_cell_header k NATURAL JOIN (
-                    SELECT table_id, row_id, GROUP_CONCAT(value, ' || ') AS value 
-                    FROM cells 
-                    GROUP BY table_id, row_id
-                ) c
-                WHERE k.row_id = c.row_id
-                AND k.keyword IN ${keywordQMarks}
+                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
+                FROM (
+                    SELECT DISTINCT table_id, row_id 
+                    FROM keywords_cell_header 
+                    WHERE keyword IN ${keywordQMarks}
+                ) k NATURAL JOIN titles t NATURAL JOIN cells c
+                WHERE k.table_id = t.table_id 
+                AND t.table_id = c.table_id
+                AND k.row_id = c.row_id
                 GROUP BY t.table_id, c.row_id
     
                 UNION
@@ -135,8 +135,9 @@ class Database {
                     SELECT DISTINCT table_id 
                     FROM keywords_title_caption 
                     WHERE keyword IN ${keywordQMarks}
-                ) k, titles t, cells c
-                WHERE k.table_id = t.table_id AND t.table_id = c.table_id
+                ) k NATURAL JOIN titles t NATURAL JOIN cells c
+                WHERE k.table_id = t.table_id 
+                AND t.table_id = c.table_id
                 GROUP BY t.table_id, c.row_id
     
                 ORDER BY t.table_id, c.row_id
@@ -607,7 +608,7 @@ class Database {
                             table_id: table_id,
                             numericalPerm: [],
                             chiTestStat: Infinity,
-                        };
+                        };  
 
                         curChiTestStat = 0;
                         idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
@@ -662,6 +663,7 @@ class Database {
         var ssCols = [];
         var pValDP = [];
         var cols = [];
+        var validTable;
         var permSet;
         var idPerms;
         var column;
@@ -674,18 +676,13 @@ class Database {
                 continue
 
             ssCols.push([])
+            sliderIndices.push(this.seedSet['sliders'][i])
             column = ssCols[ssCols.length - 1]
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
                     column.push(rows[j][i])
             }
         }
-
-        this.seedSet['types'].forEach((type, i) => {
-            if (type === 'text') {
-                sliderIndices.push(this.seedSet['sliders'][i])
-            }
-        })
 
         for (let i = 0; i < sliderIndices.length; i++)
             pValDP.push([])
@@ -715,8 +712,6 @@ class Database {
                         tables[i]['numericalPerm'] = [];
                         tables[i]['chiTestStat'] = 0;
                     }
-
-                    console.log(tables.length)
 
                 } else if (tables.length === 0) {
                     /* No numerical columns satisfy the slider value */
@@ -761,28 +756,26 @@ class Database {
                         })
                     }
 
-                    console.log(i, tables.length, cols['colIDs'])
+                    validTable = true;
 
                     table['textualPerm'] = []
-                    table['textScore'] = -1;
+                    table['textScore'] = 0;
 
-                    idPerms = combinatorics.permutation(cols['colIDs'], numTextual)
 
                     /* Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative p-value */
-                    combinatorics.permutation(cols['columns'], numTextual).forEach(perm => {
-                        idPerm = idPerms.next();
+                    combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                         curCumProbs = [];
 
                         for (let i = 0; i < cols.length; i++) {
-                            curCumProbs.push(pValDP[i][idPerm[i]])
+                            curCumProbs.push(pValDP[i][perm[i]])
                         }
 
                         pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
                         curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
 
                         if (pass && curCumProbs > table['textScore']) {
-                            table['textualPerm'] = idPerm;
+                            table['textualPerm'] = perm;
                             table['textScore'] = curCumProbs
                         }
                     })
@@ -798,6 +791,7 @@ class Database {
 
                 resolve(tables)
             } catch (error) {
+                console.log(error)
                 reject(error)
             }
         })
@@ -816,6 +810,8 @@ class Database {
          */
         var cases;
         var stmt;
+
+        console.log(tables.length)
 
         return new Promise((resolve, reject) => {
             try {
