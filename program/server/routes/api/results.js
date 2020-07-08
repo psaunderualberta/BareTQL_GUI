@@ -27,6 +27,18 @@ router.get('/seed-set', (req, res) => {
     })
 });
 
+router.get('/swap', (req, res) => {
+    db.swapCells(req.query.rowIDs, req.query.colIDs)
+    .then((result) => {
+        console.log(result)
+        res.send(result)
+    })
+    .catch((err) => {
+        console.log(err)
+        res.send(err);
+    })
+})
+
 router.get('/delete', (req, res) => {
     /* Used to delete columns from the user's table */
     db.deleteCols(req.query.del)

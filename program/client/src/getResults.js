@@ -1,10 +1,18 @@
 const axios = require('axios');
-const Retrieval = require('retrieval')
+const bm25 = require('wink-bm25-text-search')
+const nlp = require('wink-nlp-utils')
 
 const kwURL = 'http://localhost:3000/api/results/keyword/?keyword='; // hardcoded for now
 const seedSetURL = 'http://localhost:3000/api/results/seed-set/?tableIDs=';
 const dotOpURL = 'http://localhost:3000/api/results/dot-op/?dotOp='
 const deleteURL = 'http://localhost:3000/api/results/delete/?del='
+const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
+
+const pipe = [
+    nlp.string.lowerCase,
+    nlp.string.tokenize0,
+    nlp.tokens.stem,
+];
 
 class ResultService {
     
@@ -25,7 +33,6 @@ class ResultService {
                 var url = kwURL + keywords.replace(new RegExp(/ *, */, 'gi'), () => {
                     return '&keyword='
                 })
-                // console.log(url);
 
                 axios.get(url)
                 .then((response) => {
@@ -67,6 +74,28 @@ class ResultService {
                 })
             } catch (error) {
                 reject(error);
+            }
+        })
+    }
+
+    static swapCells(indices) {
+        /* Handles the swapping of the cells the user selected
+         * 
+         * Arguments:
+         * - indices: an array of arrays containing the row and column indices of the 
+         *      cells to be swapped
+         * 
+         * Returns:
+         * - Promise: Resolves if successfully swapped cells, rejects otherwise */
+        return new Promise((resolve, reject) => {
+            try {
+                var url = `${swapURL}${indices.map(index => index[0]).join('&rowIDs=')}&colIDs=${indices.map(index => index[1]).join('&colIDs=')}`
+                axios.get(url)
+                .then((response) => {
+                    resolve(response['data']);
+                })
+            } catch (err) {
+                reject(err)
             }
         })
     }
@@ -145,7 +174,8 @@ class ResultService {
             } else{
                 tables[item["table_id"]] = {
                     title: item['title'],
-                    rows: [item]
+                    rows: [item],
+                    rowCount: item['rowCount']
                 }
             }
             delete item["table_id"]
@@ -161,14 +191,15 @@ class ResultService {
             
             tables[id]['rows'] = rows
         }
+
+        // console.log(tables);
         return tables;
     }
 
     static rankTables(tables, keywords) {
         /* This function ranks the tables returned by 
          * the keyword search based on the Okapi BM25 
-         * retrieval function, where D is a given table,
-         * Q is the array of keywords, k_1 = 1.5, and b = 0.75.
+         * retrieval function
          * https://en.wikipedia.org/wiki/Okapi_BM25
          * 
          * Arguments: 
@@ -179,56 +210,76 @@ class ResultService {
          * - tables object, modified to use rank as key rather than table_id.
          * 
          */
-        let K = 1.5, B = 0.75
-        let rt = new Retrieval(K, B);
 
-        var tableArr = ResultService.tablesToArray(tables)
-        rt.index(tableArr)
 
-        let results = rt.search(keywords)
+        /* Standard pipe and config from Wink-bm25 documentation
+         * https://www.npmjs.com/package/wink-bm25-text-search
+         * Accessed June 19th, 2020 */
+        
         var rankedTables = [];
-        var id;
-        var table;
-
-        results.forEach(result => {
-            id = result.split(' - ')[0] // Get table id
-            table = tables[id]
-            rankedTables.push({
-                table_id: id,
-                ...table,
+        var engine = bm25();
+        
+        /* Wink-BM25() requries at least 3 results (tables) */
+        if (Object.keys(tables).length < 3) {
+            Object.keys(tables).forEach(id => {
+                rankedTables.push({
+                    table_id: id,
+                    ...tables[id]
+                })
             })
-        })
+        } else {
+
+            // Preparatory tasks
+            engine.defineConfig( { 
+                fldWeights: {title: 5, rows: 1},
+                bm25Params: {k1: 1.2, b: 0.75, k: 1}
+            });
+    
+            engine.definePrepTasks(pipe);
+            ResultService.addTablesToEngine(tables, engine)
+    
+            // Indexing
+            engine.consolidate()
+    
+            // Searching
+            let results = engine.search(keywords, 40)
+    
+            var id;
+            var table;
+    
+            results.forEach(result => {
+                id = result[0]
+                table = tables[id]
+                rankedTables.push({
+                    table_id: id,
+                    ...table,
+                })
+            })
+        }
 
         return rankedTables
 
     }
 
-    static tablesToArray(tables) {
-        /* Organizes the tables into an array of the following form:
-         * [
-         *    "<table_id> - <string of rows, no separators>"
-         *     ...
-         * ]
+    static addTablesToEngine(tables, engine) {
+        /* Organizes each table into an object, with fields for the table_id, 
+         * title and the table rows.
          * 
          * Arguments: 
          * - tables: The tables object formatted with 'handleResponse()'
          * 
          * Returns:
-         * - array formatted to the above description
+         * - Array of objects, with each object representing a table
+         *      as formatted above
          */
         
          // TODO: Somehow include a bias for the location of the keywords
-         var tableArr = [];
-         var rows;
-         var str;
+         var curTable = { };
          Object.keys(tables).forEach(table_id => {
-                                                                    /* Join rows, split cells on separator, join cells with space */
-            rows = `${tables[table_id]['title']} ${Object.values(tables[table_id]['rows']).join(' ').split(' || ').join(' ')}`;
-            str = `${table_id} - ${rows}`
-            tableArr.push(str);
+            curTable['title'] = tables[table_id]['title']           /* Join rows, split cells on separator, join cells with space */
+            curTable['rows'] = Object.values(tables[table_id]['rows']).join(' ').split(' || ').join(' ')
+            engine.addDoc(curTable, table_id)
          })
-
-         return tableArr
     }
 }
 

@@ -36,18 +36,23 @@ export default {
 
 </script>
 
-
-
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
 
 body {
     background: #1f1e1e;
     color: #80C080;
+    font-family: "Roboto";
+}
+
+p {
+    margin: 0 0 1em 0
 }
 
 ul {
     list-style: none;
 }
+
 
 input[type='submit'], button {
     border: 2px solid rgba(180, 180, 180, 0.8);
@@ -55,13 +60,19 @@ input[type='submit'], button {
     border-radius: 2px;
     background: none;
     color:#80C080;
+    margin-bottom: 0.5%;
 }
 
+
 input[type=checkbox] {
-  visibility: hidden;
+    display: none;
 }
 
 input[type=checkbox]:checked + label {
+    opacity: 0.5;
+}
+
+.deactivate {
     opacity: 0.5;
 }
 
@@ -69,11 +80,12 @@ input[type=checkbox]:checked + label {
     padding: 1% 0;
     margin-bottom: 1%;
 }
-/* Divide the page into two 'halves',
+
+/* Divide the webpage into two 'halves',
 like an open book */
 .page {
-    width: 46%;
-    margin: 1%;
+    width: 48%;
+    margin: 0 1%;
     float: left;
 }
 
@@ -81,12 +93,10 @@ like an open book */
   text-align: center;
 }
 
-/* Display separation during development */
 .separate-components {
   /* border: 2px solid black; */
     border-radius: 5px;
     background: #2c2b2b;
-    margin: 1px;
 }
 
 

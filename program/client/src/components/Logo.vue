@@ -1,7 +1,7 @@
 <template>
     <div id='logo'>
         <h1>BareTQL</h1>
-        <h4>Built by Paul Saunders</h4>
+        <a href="https://github.com/psaunderualberta/BareTQL_GUI">Link to project page</a>
     </div>
 </template>
 
@@ -13,6 +13,13 @@ export default {
 </script>
 
 
-<style>
+<style scoped>
+a {
+    color: inherit;
+}
 
+#logo {
+    margin-bottom: 1%;
+    padding-bottom: 0.5%;
+}
 </style>
