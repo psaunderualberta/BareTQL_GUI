@@ -460,17 +460,17 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getNumericalMatches()
-                    .then((results) => {
-                        return this.getTextualMatches(results)
-                    }).then((results) => {
-                        return this.getPermutedRows(results)
-                    }).then((results) => {
-                        resolve(this.rankResults(results));
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                        resolve([])
-                    })
+                .then((results) => {
+                    return this.getTextualMatches(results)
+                }).then((results) => {
+                    return this.getPermutedRows(results)
+                }).then((results) => {
+                    resolve(this.rankResults(results));
+                })
+                .catch((error) => {
+                    console.log(error);
+                    resolve([])
+                })
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -527,7 +527,7 @@ class Database {
                     stmt = this.db.prepare(`
                         SELECT DISTINCT table_id
                         FROM cells c NATURAL JOIN columns col    
-                        WHERE c.table_id IN 
+                        NATURAL JOIN
                         (
                             SELECT table_id
                             FROM columns
@@ -543,7 +543,7 @@ class Database {
                             GROUP BY table_id
                             HAVING COUNT(DISTINCT col_id) >= ?
                         )
-                        AND col.type = 'numerical' 
+                        WHERE col.type = 'numerical' 
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
@@ -556,11 +556,12 @@ class Database {
                         results[i])
                 }
 
+
                 var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
                 var tables = [];
-                var pValDP = [];  
+                var pValDP = [];
                 var cols = [];
                 var curChiTestStat;
                 var bestPerm;
@@ -608,24 +609,25 @@ class Database {
                         for (let i = 0; i < ssCols.length; i++) {
                             cols['columns'].forEach((col, j) => {
                                 if (statistics.standardDeviation(ssCols[i]) === 0 && statistics.standardDeviation(col) === 0)
-                                    pValDP[i][cols['colIDs'][j]] = Math.log(0.98 * (Number(ssCols[i][0] === col[0])) + 0.01)
+                                    pValDP[i][cols['colIDs'][j]] = Math.log(0.98 * (Number(ssCols[i][0] === col[0])) + 0.01) // Map between 0.01 and 0.99 to avoid log(0)
                                 else
-                                    pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col)) // Low p-values are bad
+                                    pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col))
                             })
                         }
 
-                        if (pValDP[0].some(pVal => pVal <= Math.log(sliderIndices[0] / 100)) && cols['colIDs'].length <= 20) {
+                        if (pValDP[0].some(pVal => pVal >= Math.log(sliderIndices[0] / 100)) && cols['colIDs'].length <= 20) {
                             bestPerm = {
                                 table_id: table_id,
                                 numericalPerm: [],
                                 chiTestStat: Infinity,
-                            };  
+                            };
 
                             curChiTestStat = 0;
                             idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
 
                             /* Iterate over all permutations of the columns, 
-                            * finding the one that returns the lowest cumulative p-value */
+                            * finding the one that returns the highest chi^2 test statistic
+                            * by using Fisher's method */
                             combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
                                 idPerm = idPerms.next();
                                 curChiTestStat = 0;
@@ -698,6 +700,7 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
+
                 /* No numerical in seed set, look through all textual columns */
                 if (this.seedSet['types'].filter(type => type === 'numerical').length === 0) {
                     var ssKeyCol = JSON.stringify(ssCols[0])
@@ -731,7 +734,7 @@ class Database {
                     }
 
                 } else if (tables.length === 0) {
-                    /* No numerical columns satisfy the slider value */
+                    /* Numerical columns in seed set, but none satisfy the slider values */
                     resolve([])
                 }
 
@@ -765,7 +768,7 @@ class Database {
                         }
                     }
 
-                    // Fill DP array
+                    /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
                             permSet = new Set([...col]);
@@ -776,11 +779,10 @@ class Database {
                     table['textualPerm'] = []
                     table['textScore'] = 0;
 
-                    
+
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
                      * finding the one that returns the lowest cumulative p-value */
-
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
@@ -805,7 +807,6 @@ class Database {
                     /* Set a 'base score' for the table to be used when ranking rows */
                     else
                         table['score'] = table['chiTestStat'] + table['textScore']
-
                 }
 
                 resolve(tables)
@@ -906,10 +907,10 @@ class Database {
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
                                     score += Math.pow(row[i] - tableRow[i], 2)
-                                             * (this.seedSet['sliders'][i])
+                                        * (this.seedSet['sliders'][i])
                                 else {
                                     score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2)
-                                             * (this.seedSet['sliders'][i])
+                                        * (this.seedSet['sliders'][i])
                                 }
                             }
                         }
@@ -1110,85 +1111,3 @@ class Database {
 }
 
 module.exports = Database;
-
-/*
-    TEST QUERIES: RUN IN TERMINAL
-
-    db.aggregate('toArr', {
-        start: () => [],
-        step: (array, nextValue) => {
-            array.push(nextValue);
-        },
-        result: array => JSON.stringify(array)
-    });
-
-
-
-    SELECT table_id, row_id, col_id, value
-    FROM cells c NATURAL JOIN types
-    WHERE t.type = 'numerical
-    AND c.location != 'header'
-    GROUP BY table_id, col_id
-    HAVING (something about T_TEST)
-*/
-
-/*
-    UNUSED FUNCTIONS
-
-        getRelatedTables() {
-        /* 'key' refers to primary key, LH column.
-         *
-         * Get titles of the tables with rows
-         * currently in the seed set.
-         *
-         * Find similar titles (HOW)
-         * Try:
-         *      - Dice
-         *      - Levenshtein
-         *      - Jaro-Winkler
-         *
-         // END COMMENT
-        var results = [];
-        var limit = 1.0;
-        var prom;
-
-        return new Promise((resolve, reject) => {
-            do {
-                const stmt = this.db.prepare(`
-                    WITH currentTitles AS (
-                        SELECT table_id, title
-                        FROM titles
-                        WHERE table_id in (${this.seedSet['table_ids']})
-                    )
-                    SELECT DISTINCT c.table_id AS c, t.table_id AS t, t.title
-                    FROM titles t, currentTitles c
-                    WHERE c.title != t.title -- Change to table_id if you only want to ensure the actual content isn't the same
-                    AND
-                    (
-                        (dice(c.title, t.title) >= ${limit})
-                    );
-                `)
-                prom = this.all(stmt, [], results)
-                limit -= 0.05;
-            } while ( new Set(results.map(result => result['title'])).size <= 1 ); // At least two unique tables in results
-            prom
-            .then(() => {
-                console.log(results, limit)
-                resolve(results);
-            })
-            .catch((error) => {
-                reject(error);
-            })
-        });
-    }
-
-        this.db.function('sameType', (cVal, ssVal) => Number(isNaN(cVal) === isNaN(ssVal)))
-
-        this.db.function('proximity', (cVal, ssVal) => {
-            if (!isNaN(ssVal))
-                return Math.abs(Number(cVal) - Number(ssVal))
-            else
-                return jaroSim(cVal, ssVal)
-        });
-
-*/
