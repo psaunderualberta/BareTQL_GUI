@@ -547,7 +547,7 @@ class Database {
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING T_TEST(?, toArr(value)) > ?
+                        HAVING T_TEST(?, toArr(value)) >= ?
                         AND SEM(toArr(value)) < ?;
                     `)
 
@@ -623,13 +623,11 @@ class Database {
                             };
 
                             curChiTestStat = 0;
-                            idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
 
                             /* Iterate over all permutations of the columns, 
                             * finding the one that returns the highest chi^2 test statistic
                             * by using Fisher's method */
-                            combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
-                                idPerm = idPerms.next();
+                            combinatorics.permutation(cols['colIDs'], numNumerical).forEach(idPerm => {
                                 curChiTestStat = 0;
 
                                 for (let i = 0; i < ssCols.length; i++) {
@@ -772,17 +770,18 @@ class Database {
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
                             permSet = new Set([...col]);
-                            pValDP[i][cols['colIDs'][j]] = new Set(ssCols[i].filter(value => permSet.has(value))).size / ssCols[i].length
+                            pValDP[i][cols['colIDs'][j]] = new Set(ssCols[i].filter(value => permSet.has(value))).size / new Set(ssCols[i]).size
                         })
                     }
 
                     table['textualPerm'] = []
-                    table['textScore'] = 0;
+                    table['textScore'] = -1;
 
 
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
-                     * finding the one that returns the lowest cumulative p-value */
+                     * finding the one that returns the lowest cumulative overlap similarity */
+
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
@@ -853,7 +852,7 @@ class Database {
                     }
 
                     // Columns that are not in the column range of the seed set are ignored.
-                    cases += `ELSE ${ignoredCols}`
+                    cases += `ELSE ${ignoredCols}` 
 
                     stmt = this.db.prepare(`
                         SELECT GROUP_CONCAT(value, ' || ') AS value
