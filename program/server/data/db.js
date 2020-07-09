@@ -560,8 +560,6 @@ class Database {
                 var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
-                console.log(union)
-
                 var tables = [];
                 var pValDP = [];
                 var cols = [];
@@ -616,8 +614,9 @@ class Database {
                             })
                         }
 
-                        if (pValDP[0].some(pVal => pVal >= Math.log(sliderIndices[0] / 100)) && cols['colIDs'].length <= 20) {
-                            bestPerm = {
+                        if (pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))) && cols['colIDs'].length <= 20) {
+                            console.log(cols['table_id'], cols['colIDs'].length)
+                            bestPerm = {    
                                 table_id: table_id,
                                 numericalPerm: [],
                                 chiTestStat: Infinity,
@@ -782,6 +781,8 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
                      * finding the one that returns the lowest cumulative overlap similarity */
+
+                    /* Possibly only run this condition if numerical querying returned nothing */
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
@@ -904,6 +905,8 @@ class Database {
                         score = table['score'];
                         tableRow = tableRow.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
                         for (let row of rows) {
+
+                            /* Emphasises NULL values, esp. for numerical columns */
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
                                     score += Math.pow(row[i] - tableRow[i], 2)
