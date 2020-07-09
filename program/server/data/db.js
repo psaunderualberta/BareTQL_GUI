@@ -560,13 +560,13 @@ class Database {
                 var union = results.filter(result => result.length > 0).map(result => result.map(table => table['table_id']))
                 union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
+                console.log(union)
+
                 var tables = [];
                 var pValDP = [];
                 var cols = [];
                 var curChiTestStat;
                 var bestPerm;
-                var idPerms;
-                var idPerm;
 
                 for (let i = 0; i < numNumerical; i++)
                     pValDP.push([])
@@ -582,6 +582,7 @@ class Database {
                             SELECT table_id, col_id, toArr(value) AS column
                             FROM cells c NATURAL JOIN columns col
                             WHERE col.type = 'numerical'
+                            AND c.value != ''
                             AND c.location != 'header'
                             AND table_id = ?
                             GROUP BY table_id, col_id
@@ -781,7 +782,6 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
                      * finding the one that returns the lowest cumulative overlap similarity */
-
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
@@ -807,6 +807,7 @@ class Database {
                     else
                         table['score'] = table['chiTestStat'] + table['textScore']
                 }
+
 
                 resolve(tables)
             } catch (error) {
