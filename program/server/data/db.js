@@ -502,6 +502,7 @@ class Database {
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var sliderIndices = [];
         var results = [];
         var column = [];
         var ssCols = [];
@@ -514,6 +515,7 @@ class Database {
                     if (this.seedSet['types'][i] !== 'numerical')
                         continue
                     ssCols.push([])
+                    sliderIndices.push(this.seedSet['sliders'][i])
                     column = ssCols[ssCols.length - 1]
                     for (let j = 0; j < rows.length; j++) {
                         if (rows[j][i] !== "NULL")
@@ -558,12 +560,12 @@ class Database {
                 union = [...new Set(union.flat())] // NOTE: this will be 'undefined' if results is empty
 
                 var tables = [];
+                var pValDP = [];  
                 var cols = [];
                 var curChiTestStat;
                 var bestPerm;
                 var idPerms;
                 var idPerm;
-                var pValDP = [];
 
                 for (let i = 0; i < numNumerical; i++)
                     pValDP.push([])
@@ -572,6 +574,7 @@ class Database {
                     resolve([]) // No results for numerical columns
                 } else {
                     /* Get the best permutation for numerical columns for each table */
+                    var count = 0;
                     for (const table_id of union) {
                         cols = [];
                         stmt = this.db.prepare(`
@@ -611,34 +614,36 @@ class Database {
                             })
                         }
 
-                        bestPerm = {
-                            table_id: table_id,
-                            numericalPerm: [],
-                            chiTestStat: Infinity,
-                        };  
+                        if (pValDP[0].some(pVal => pVal <= Math.log(sliderIndices[0] / 100)) && cols['colIDs'].length <= 20) {
+                            bestPerm = {
+                                table_id: table_id,
+                                numericalPerm: [],
+                                chiTestStat: Infinity,
+                            };  
 
-                        curChiTestStat = 0;
-                        idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
-
-                        /* Iterate over all permutations of the columns, 
-                         * finding the one that returns the lowest cumulative p-value */
-                        combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
-                            idPerm = idPerms.next();
                             curChiTestStat = 0;
+                            idPerms = combinatorics.permutation(cols['colIDs'], numNumerical)
 
-                            for (let i = 0; i < ssCols.length; i++) {
-                                curChiTestStat += pValDP[i][idPerm[i]]
-                            }
+                            /* Iterate over all permutations of the columns, 
+                            * finding the one that returns the lowest cumulative p-value */
+                            combinatorics.permutation(cols['columns'], numNumerical).forEach(perm => {
+                                idPerm = idPerms.next();
+                                curChiTestStat = 0;
 
-                            curChiTestStat *= -2;
+                                for (let i = 0; i < ssCols.length; i++) {
+                                    curChiTestStat += pValDP[i][idPerm[i]]
+                                }
 
-                            if (curChiTestStat < bestPerm['chiTestStat']) {
-                                bestPerm['numericalPerm'] = idPerm;
-                                bestPerm['chiTestStat'] = curChiTestStat
-                            }
-                        })
+                                curChiTestStat *= -2;
 
-                        tables.push(bestPerm)
+                                if (curChiTestStat < bestPerm['chiTestStat']) {
+                                    bestPerm['numericalPerm'] = idPerm;
+                                    bestPerm['chiTestStat'] = curChiTestStat
+                                }
+                            })
+
+                            tables.push(bestPerm)
+                        }
                     }
                 }
 
@@ -775,9 +780,8 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                      * Iterate over all permutations of the columns, 
                      * finding the one that returns the lowest cumulative p-value */
-                    var keyScores = pValDP[0]
 
-                    if (keyScores.some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
+                    if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
 
