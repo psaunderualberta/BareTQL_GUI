@@ -44,11 +44,19 @@
                     <tr>
                         <td v-for="col in numCols" :key="col">
                             <div style="text-align: left;">
-                                <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
-                                <label :for="'delete'+col" style="padding: 1%">X</label>
+                                <span>
+                                    <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
+                                    <label :for="'delete'+col" style="padding: 0.5%">X</label>
+                                </span>
+                                <span style="float: right;">
+                                    <input type="checkbox" :id="'unique'+col" :value="col" v-model="uniqueCols">
+                                    <label :for="'unique'+col" style="padding-right: 1%;">Unique</label>
+                                </span>
                             </div>
-                            <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
-                            <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
+                            <div style="float: none;">
+                                <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
+                                <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -118,14 +126,15 @@ export default {
                 {message: 'Expand Columns (XC)', value: 'XC'},
                 {message: 'Fill Null Values', value: 'Fill'},
             ],
-            numCols: 0,
-            dotOp: "",
-            nullCount: 0,
-            table: [],
-            expandedRows: null,
-            deletions: [],
-            sliderValues: [],
             document: document,
+            expandedRows: null,
+            sliderValues: [],
+            uniqueCols: [],
+            deletions: [],
+            nullCount: 0,
+            numCols: 0,
+            table: [],
+            dotOp: "",
         }
     },
 
@@ -155,7 +164,7 @@ export default {
             var submitButton = this.document.querySelector("#dot-op-submit")
             changeButton(submitButton, "Loading Results...")
             
-            ResultService.handleDotOps(this.dotOp, this.sliderValues)
+            ResultService.handleDotOps(this.dotOp, this.sliderValues, this.uniqueCols)
             .then((data) => {
                 changeButton(submitButton, "Click to perform operation")
                 this.expandedRows = this.handleResponse(data);
@@ -239,7 +248,7 @@ export default {
 
     created() {
         /* Initial call to get the Seed Set from the API */
-        ResultService.handleDotOps(undefined, this.sliderValues)
+        ResultService.handleDotOps(undefined, this.sliderValues, this.uniqueCols)
         .then((data) => {
             this.table = this.handleResponse(data, true);
         })
