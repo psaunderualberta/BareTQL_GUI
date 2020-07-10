@@ -675,7 +675,6 @@ class Database {
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
-        var minRelThresh = 0.4;
         var curCumProbs = [];
         var ssCols = [];
         var pValDP = [];
@@ -716,7 +715,7 @@ class Database {
                             WHERE col_id = 0
                             AND type = 'text'
                             GROUP BY table_id
-                            HAVING OVERLAP_SIM(?, toArr(value)) >= ?
+                            HAVING OVERLAP_SIM(?, toArr(value)) > 0
                         )
                         WHERE type = 'text'
                         GROUP BY table_id
@@ -729,7 +728,7 @@ class Database {
                         WHERE type = 'numerical';
                     `)
 
-                    this.all(stmt, [ssKeyCol, sliderIndices[0] / 100, numTextual], tables)
+                    this.all(stmt, [ssKeyCol, numTextual], tables)
 
                     for (let i = 0; i < tables.length; i++) {
                         tables[i]['numericalPerm'] = [];
@@ -796,7 +795,7 @@ class Database {
                                 curCumProbs.push(pValDP[i][perm[i]])
                             }
 
-                            pass = curCumProbs.every((val, i) => val >= Math.max(sliderIndices[i] / 100, minRelThresh))
+                            pass = curCumProbs.every((val, i) => val >=sliderIndices[i] / 100)
                             curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
 
                             if (pass && curCumProbs > table['textScore']) {
