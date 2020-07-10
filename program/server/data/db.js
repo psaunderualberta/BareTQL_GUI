@@ -197,12 +197,13 @@ class Database {
         tableIDs = this.makeStrArr(tableIDs)
 
         this.seedSet = {
-            sliders: [],
-            rows: [],
-            types: [],
             table_ids: tableIDs.map(id => id.trim()),
             row_ids: rowIDs.map(id => id.trim()),
+            uniqueCols: [],
+            sliders: [],
             numCols: 0,
+            types: [],
+            rows: [],
         };
 
         /* Create 'table' based on values of tableIDs, rowIDs
@@ -395,7 +396,7 @@ class Database {
         })
     }
 
-    handleDotOps(dotOp, sliderValues) {
+    handleDotOps(dotOp, sliderValues, uniqueCols) {
         /* Handles all dot operations, calling the correct functions to mutate the 
          * seed set attribute. The first time this method is called, we are initializing 
          * the operations page and so return the rows of the seed set without changing them.
@@ -414,6 +415,11 @@ class Database {
 
                 for (let i = 0; i < sliderValues.length; i++) {
                     this.seedSet['sliders'][i] = Number(sliderValues[i])
+                }
+
+                this.seedSet['uniqueCols'] = []
+                for (let i = 0; i < uniqueCols.length; i++) {
+                    this.seedSet['uniqueCols'].push(uniqueCols[i] - 1)
                 }
 
                 /* Handle specific dot op */
@@ -615,7 +621,6 @@ class Database {
                         }
 
                         if (pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))) && cols['colIDs'].length <= 20) {
-                            console.log(cols['table_id'], cols['colIDs'].length)
                             bestPerm = {    
                                 table_id: table_id,
                                 numericalPerm: [],
@@ -936,6 +941,17 @@ class Database {
                 reject(error)
             }
         })
+    }
+
+    applyUniqueConstraints(rankedRows) {
+        /* Applies the unique constraints for each column that the 
+         * user tagged as 'unique'.
+         * 
+         * Arguments:
+         * - rankedRows: The rows that are sorted in ascending order according to their score
+         * 
+         * Returns: The top 10 results, checked to ensure unique constraints are valid */
+        
     }
 
     all(stmt, params, results) {
