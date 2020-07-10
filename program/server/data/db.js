@@ -924,16 +924,15 @@ class Database {
                         }
 
                         results.push({
-                            row: tableRow.join(' || '),
+                            row: tableRow,
                             score: score,
                         })
                     }
                 }
 
-                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
+                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }).map(res => {return res['row']}); // Sort in ascending order
 
-                results = results.slice(0, 10).map(res => { return res['row'] })
-
+                results = this.applyUniqueConstraints(results)
 
                 resolve(results)
             } catch (error) {
@@ -951,7 +950,24 @@ class Database {
          * - rankedRows: The rows that are sorted in ascending order according to their score
          * 
          * Returns: The top 10 results, checked to ensure unique constraints are valid */
-        
+        var rowsInSeedSet = 0;
+        var columnSets = [];
+        var uniqueRows = [];
+        var rrIndex = 0;
+        for (const cell of this.seedSet['uniqueCols']) columnSets.push(new Set())
+
+        while (uniqueRows.length < 10 && rrIndex < rankedRows.length) {
+
+            if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows[rrIndex][col])).every(value => value === false)) {
+                for (let [i, el] of this.seedSet['uniqueCols'].entries()) 
+                    columnSets[i].add(rankedRows[rrIndex][el])
+                uniqueRows.push(rankedRows[rrIndex++].join(' || '))
+            } else {
+                rrIndex++;
+            }
+        } 
+
+        return uniqueRows
     }
 
     all(stmt, params, results) {
