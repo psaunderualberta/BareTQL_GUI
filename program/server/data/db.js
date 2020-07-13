@@ -517,8 +517,22 @@ class Database {
         var bestPerm; 
         var permSet;
         var column;
+        var params;
         var pass;
-        var stmt;
+
+        var stmt = `SELECT table_id
+            FROM columns NATURAL JOIN (
+                SELECT table_id
+                FROM cells NATURAL JOIN columns
+                WHERE col_id = ?
+                AND type = 'text'
+                GROUP BY table_id
+                HAVING OVERLAP_SIM(?, toArr(value)) > 0
+            )
+            WHERE type = 'text'
+            GROUP BY table_id
+            HAVING COUNT(DISTINCT col_id) >= ?
+            `
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'text')
@@ -545,37 +559,30 @@ class Database {
                 /* First step of table filtering: look for overlap in key column */
                 if (firstTextCol < this.seedSet['types'].length) {
                     var ssKeyCol = JSON.stringify(ssCols[firstTextCol])
-    
-                    stmt = this.db.prepare(`
-                        SELECT table_id
-                        FROM columns NATURAL JOIN (
+                    params = [firstTextCol, ssKeyCol, numTextual]
+                    if (numNumerical) {
+                        stmt += `
+                            INTERSECT
+                                        
                             SELECT table_id
-                            FROM cells NATURAL JOIN columns
-                            WHERE col_id = ?
-                            AND type = 'text'
+                            FROM columns
+                            WHERE type = 'numerical'
                             GROUP BY table_id
-                            HAVING OVERLAP_SIM(?, toArr(value)) > 0
-                        )
-                        WHERE type = 'text'
-                        GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?
-                        
-                        INTERSECT
-                        
-                        SELECT table_id
-                        FROM columns
-                        WHERE type = 'numerical'
-                        GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?;
-                    `)
+                            HAVING COUNT(DISTINCT col_id) >= ?;`
+                        params.push(numNumerical)
+                    }
+
+                    stmt = this.db.prepare(stmt)
     
-                    this.all(stmt, [firstTextCol, ssKeyCol, numTextual, numNumerical], ids)
+                    this.all(stmt, params, ids)
     
                 } else {
                     resolve([]) /* No textual columns in seed set */
                 }
 
-                for (const result of ids) {
+                var result;
+                for (let i = 0; i < ids.length; i++) {
+                    result = ids[i]
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -594,8 +601,6 @@ class Database {
                         colIDs: cols.map(res => res['col_id'])
                     }
 
-                    console.log(cols)
-
                     /* Re-initialize dynamic programming array */
                     pValDP = []
                     for (let i = 0; i < sliderIndices.length; i++) {
@@ -613,17 +618,17 @@ class Database {
                         })
                     }
 
+                    bestPerm = {
+                        table_id: result['table_id'],
+                        textualPerm: [],
+                        textScore: 0,
+                    };
                     /* If the key column in the seed set has a successful mapping,
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
                    
                    /* Possibly only run this condition if numerical querying returned nothing */
                    if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
-                        bestPerm = {
-                            table_id: result['table_id'],
-                            textualPerm: [],
-                            textScore: 0,
-                        };
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
 
@@ -639,8 +644,10 @@ class Database {
                                 bestPerm['textScore'] = curCumProbs
                             }
                         })
-                        tables.push(bestPerm)
                     }
+
+                    if (!numTextual || bestPerm['textualPerm'].length !== 0)
+                        tables.push(bestPerm)
                 }
 
                 resolve(tables)
@@ -665,6 +672,7 @@ class Database {
          * - Promise which resolves if query is successful, rejects otherwise.*/
 
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
+        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var column = [];
@@ -722,6 +730,8 @@ class Database {
                     }
                 }
 
+                console.log(tableSaver['tables'])
+
                 var table;
                 var pValDP = [];
                 var cols = [];
@@ -772,8 +782,10 @@ class Database {
 
                     table['numericalPerm'] = []
                     table['chiTestStat'] = Infinity;
-
-                    if (pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))) && cols['colIDs'].length <= 20) {
+                    
+                    if (!numTextual || (numNumerical
+                         && cols['colIDs'].length <= 20
+                         && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))))) {
                         curChiTestStat = 0;
 
                         /* Iterate over all permutations of the columns, 
@@ -796,12 +808,14 @@ class Database {
                         })
                     }
                     
-                    if (table['numericalPerm'].length === 0)
+                    if (numNumerical && table['numericalPerm'].length === 0)
                         tableSaver['tables'].splice(i--, 1)
 
                     /* Set a 'base score' for the table to be used when ranking rows */
-                    else
+                    else if (numNumerical)
                         table['score'] = table['chiTestStat'] + table['textScore']
+                    else
+                        table['score'] = table['textScore']
                 }
 
                 resolve(tableSaver['tables']);
