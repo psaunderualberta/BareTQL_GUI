@@ -55,7 +55,7 @@
                             </div>
                             <div style="float: none;">
                                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}%  Sticky</p>
-                                <input type="range" min="0" max="100" value="50" class="slider" v-model="sliderValues[col - 1]">
+                                <input type="range" min="0" max="100" value=" " class="slider" v-model="sliderValues[col - 1]">
                             </div>
                         </td>
                     </tr>
