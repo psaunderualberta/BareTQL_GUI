@@ -602,13 +602,7 @@ class Database {
                     }
 
                     /* Re-initialize dynamic programming array */
-                    pValDP = []
-                    for (let i = 0; i < sliderIndices.length; i++) {
-                        pValDP[i] = [];
-                        for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
-                            pValDP[i].push(-1)
-                        }
-                    }
+                    this.resetDPArr(pValDP, sliderIndices.length, Math.max(...cols['colIDs']))
 
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
@@ -762,13 +756,7 @@ class Database {
                     }
 
                     /* Re-initialize dynamic programming array */
-                    pValDP = []
-                    for (let i = 0; i < numNumerical; i++) {
-                        pValDP[i] = [];
-                        for (let j = 0; j <= Math.max(...cols['colIDs']); j++) {
-                            pValDP[i].push(-1)
-                        }
-                    }
+                    this.resetDPArr(pValDP, numNumerical, Math.max(...cols['colIDs']))
 
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
@@ -1125,6 +1113,27 @@ class Database {
         }
 
         return qMarks
+    }
+
+    resetDPArr(dpArr, ssCols, potTableCols) {
+        /* Resets the DP array used in finding both numerical mappings
+         * and textual mappings
+         * 
+         * Arguments:
+         * - dpArr: The array used to memoize the values
+         * - ssCols: The length of the # of seed set columns of the type we are
+         *      analyzing
+         * - potTableCols: The maximum column number of the table for which we are
+         *      finding a mapping
+         * 
+         * Returns:
+         * - undefined: All operations are performed dpArr in place. */ 
+        for (let i = 0; i < ssCols; i++) {
+            dpArr[i] = [];
+            for (let j = 0; j <= potTableCols; j++) {
+                dpArr[i].push(-1)
+            }
+        }
     }
 
     swap(arr, i, j) {
