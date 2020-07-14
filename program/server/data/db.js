@@ -267,7 +267,6 @@ class Database {
 
         if (changeSeed)
             this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
-
     }
 
     groupCols(rows) {
@@ -406,9 +405,9 @@ class Database {
          * Returns:
          * - Promise: resolves with new rows of seed set, rejects with error.
          */
-        
+
         var seedCopy;
-        
+
         return new Promise((resolve, reject) => {
             try {
 
@@ -514,7 +513,7 @@ class Database {
         var pValDP = [];
         var cols = [];
         var ids = [];
-        var bestPerm; 
+        var bestPerm;
         var permSet;
         var column;
         var params;
@@ -552,10 +551,11 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                
+
                 var firstTextCol = 0
                 while (firstTextCol < this.seedSet['types'].length && this.seedSet['types'][firstTextCol] !== 'text')
                     firstTextCol++
+
                 /* First step of table filtering: look for overlap in key column */
                 if (firstTextCol < this.seedSet['types'].length) {
                     var ssKeyCol = JSON.stringify(ssCols[firstTextCol])
@@ -573,13 +573,19 @@ class Database {
                     }
 
                     stmt = this.db.prepare(stmt)
-    
+
                     this.all(stmt, params, ids)
-    
+
                 } else {
                     resolve([]) /* No textual columns in seed set */
                 }
 
+
+                /* The steps required to find the permutations of the textual columns
+                 * are quite similar to the steps for finding numerical column permutations.
+                 * However, there are a few important differences that prevent the two operations
+                 * from being combined into one function, such as the method used to score the permutations
+                 * and the format required of the columns retrieved */
                 var result;
                 for (let i = 0; i < ids.length; i++) {
                     result = ids[i]
@@ -620,9 +626,9 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
-                   
-                   /* Possibly only run this condition if numerical querying returned nothing */
-                   if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
+
+                    /* Possibly only run this condition if numerical querying returned nothing */
+                    if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
 
@@ -675,7 +681,7 @@ class Database {
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'numerical')
                 continue
-                 
+
             ssCols.push([])
             sliderIndices.push(this.seedSet['sliders'][i])
             column = ssCols[ssCols.length - 1]
@@ -685,15 +691,16 @@ class Database {
             }
         }
 
-        /* For some reason, 'tables' is undefined inside the following 
+        /* For some unknown reason, 'tables' is undefined inside the following 
         promise and so we define an object in which to store it */
-        var tableSaver = {tables: tables}; 
+        var tableSaver = { tables: tables };
 
         return new Promise((resolve, reject) => {
             try {
-                if (ssCols.length > 0 && tableSaver['tables'].length === 0) {
+                var tables = tableSaver['tables']
+                if (ssCols.length > 0 && tables.length === 0) {
                     column = JSON.stringify(ssCols[0])
-    
+
                     stmt = this.db.prepare(`
                         SELECT DISTINCT table_id
                         FROM cells c NATURAL JOIN columns col    
@@ -712,14 +719,14 @@ class Database {
                         HAVING T_TEST(?, toArr(value)) >= ?
                         AND SEM(toArr(value)) < ?;
                     `)
-    
+
                     this.all(stmt,
                         [numNumerical, column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0]],
-                        tableSaver['tables'])
+                        tables)
 
-                    for (let i = 0; i < tableSaver['tables'].length; i++) {
-                        tableSaver['tables'][i]['textualPerm'] = [];
-                        tableSaver['tables'][i]['textScore'] = 0;
+                    for (let i = 0; i < tables.length; i++) {
+                        tables[i]['textualPerm'] = [];
+                        tables[i]['textScore'] = 0;
                     }
                 }
 
@@ -731,8 +738,8 @@ class Database {
                 for (let i = 0; i < numNumerical; i++)
                     pValDP.push([])
                 /* Get the best permutation for numerical columns for each table */
-                for (let i = 0; i < tableSaver['tables'].length; i++) {
-                    table = tableSaver['tables'][i]
+                for (let i = 0; i < tables.length; i++) {
+                    table = tables[i]
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -767,10 +774,10 @@ class Database {
 
                     table['numericalPerm'] = []
                     table['chiTestStat'] = Infinity;
-                    
+
                     if (!numTextual || (numNumerical
-                         && cols['colIDs'].length <= 20
-                         && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))))) {
+                        && cols['colIDs'].length <= 20
+                        && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))))) {
                         curChiTestStat = 0;
 
                         /* Iterate over all permutations of the columns, 
@@ -792,9 +799,9 @@ class Database {
                             }
                         })
                     }
-                    
+
                     if (numNumerical && table['numericalPerm'].length === 0)
-                        tableSaver['tables'].splice(i--, 1)
+                        tables.splice(i--, 1)
 
                     /* Set a 'base score' for the table to be used when ranking rows */
                     else if (numNumerical)
@@ -803,7 +810,7 @@ class Database {
                         table['score'] = table['textScore']
                 }
 
-                resolve(tableSaver['tables']);
+                resolve(tables);
             } catch (error) {
                 reject(error);
             }
@@ -1123,7 +1130,7 @@ class Database {
          *      finding a mapping
          * 
          * Returns:
-         * - undefined: All operations are performed dpArr in place. */ 
+         * - undefined: All operations are performed dpArr in place. */
         for (let i = 0; i < ssCols; i++) {
             dpArr[i] = [];
             for (let j = 0; j <= potTableCols; j++) {

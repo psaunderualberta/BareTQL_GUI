@@ -86,11 +86,6 @@
             </button>
 
         </div>
-
-        <!-- User Operations
-        <div class="separate-components centering">
-
-        </div> -->
         
         <!-- Result of Set Expansion -->
         <div class="separate-components centering">
