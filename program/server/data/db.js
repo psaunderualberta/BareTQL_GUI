@@ -406,9 +406,9 @@ class Database {
          * Returns:
          * - Promise: resolves with new rows of seed set, rejects with error.
          */
-
+        
         var seedCopy;
-
+        
         return new Promise((resolve, reject) => {
             try {
 
@@ -423,9 +423,9 @@ class Database {
 
                 /* Handle specific dot op */
                 new Promise((res, rej) => {
-                    /* Only upon initialization of the dot-ops page */
-                    if (dotOp === 'undefined') {
-                        res(this.seedSet['rows'])
+                    /* Only upon initialization of the dot-ops page OR user deleted all columns */
+                    if (dotOp === 'undefined' || this.seedSet['rows'].every(row => row.length === 0)) {
+                        res(this.seedSet['rows'].flat())
 
                     } else if (dotOp === 'xr') {
                         this.xr()
@@ -646,7 +646,6 @@ class Database {
 
                 resolve(tables)
             } catch (error) {
-                console.log(error)
                 reject(error)
             }
         })
@@ -723,8 +722,6 @@ class Database {
                         tableSaver['tables'][i]['textScore'] = 0;
                     }
                 }
-
-                console.log(tableSaver['tables'])
 
                 var table;
                 var pValDP = [];
@@ -926,7 +923,6 @@ class Database {
 
                 resolve(results)
             } catch (error) {
-                console.log(error)
                 reject(error)
             }
         })

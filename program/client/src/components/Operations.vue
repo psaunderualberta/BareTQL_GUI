@@ -194,24 +194,26 @@ export default {
             this.numCols = 0;
             this.sliderValues = []
 
-            for (let i = 0; i < data['sliders'].length; i++) {
-                this.sliderValues.push(Number(data['sliders'][i]));
-            }
-
-            data = data['rows']
-
-            if (data.length > 0 && data[0].length > 0) {
-                data.forEach(row => {
-                    row = row.split(' || ')
-                    cellCount += row.length;
-                    this.numCols = Math.max(this.numCols, row.length);
+            if (typeof data['sliders'] !== 'undefined') {
+                for (let i = 0; i < data['sliders'].length; i++) {
+                    this.sliderValues.push(Number(data['sliders'][i]));
+                }
     
-                    tmp.push(row) 
-                });
+                data = data['rows']
+    
+                if (data.length > 0 && data[0].length > 0) {
+                    data.forEach(row => {
+                        row = row.split(' || ')
+                        cellCount += row.length;
+                        this.numCols = Math.max(this.numCols, row.length);
+        
+                        tmp.push(row) 
+                    });
+                }
+    
+                if (seedSet) 
+                    this.nullCount = tmp.length * this.numCols - cellCount
             }
-
-            if (seedSet) 
-                this.nullCount = tmp.length * this.numCols - cellCount
             return tmp
         },
         changeOp(newOp) {
