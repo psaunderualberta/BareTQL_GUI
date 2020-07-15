@@ -4,7 +4,7 @@ https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
 
 */
 const sqlite3 = require('better-sqlite3');
-const leven = require('leven')
+const leven = require('leven');
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
@@ -783,7 +783,7 @@ class Database {
 
                     if (!numTextual || (numNumerical
                         && cols['colIDs'].length <= 20
-                        && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 100))))) {
+                        && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 300))))) {
                         curChiTestStat = 0;
 
                         /* Iterate over all permutations of the columns, 
