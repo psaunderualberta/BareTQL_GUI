@@ -15,8 +15,7 @@ const combinatorics = require('js-combinatorics')
  * captions(table_id, caption)
  * headers(table_id, col_id, header)
  * keywords_cell_header(keyword, table_id, row_id, col_id,location)
- * keywords_title_caption(table_id, location, keyword)
- */
+ * keywords_title_caption(table_id, location, keyword) */
 
 /* An instance of the Database class represents a database */
 class Database {
