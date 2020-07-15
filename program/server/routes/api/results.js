@@ -30,11 +30,9 @@ router.get('/seed-set', (req, res) => {
 router.get('/swap', (req, res) => {
     db.swapCells(req.query.rowIDs, req.query.colIDs)
     .then((result) => {
-        console.log(result)
         res.send(result)
     })
     .catch((err) => {
-        console.log(err)
         res.send(err);
     })
 })

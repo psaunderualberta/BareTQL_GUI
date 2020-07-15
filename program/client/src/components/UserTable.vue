@@ -75,6 +75,7 @@ table {
 td {
     border: 1px solid grey;
     padding: 2px;
+    overflow: hidden;
 }
 
 </style>

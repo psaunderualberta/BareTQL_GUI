@@ -9,6 +9,7 @@ const deleteURL = 'http://localhost:3000/api/results/delete/?del='
 const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
 
 const pipe = [
+    nlp.string.trim,
     nlp.string.lowerCase,
     nlp.string.tokenize0,
     nlp.tokens.stem,
@@ -219,7 +220,9 @@ class ResultService {
         var rankedTables = [];
         var engine = bm25();
         
-        /* Wink-BM25() requries at least 3 results (tables) */
+        /* Wink-BM25() requires at least 3 documents.
+         * If there are < 3 documents (tables), just display them 
+         * as is */
         if (Object.keys(tables).length < 3) {
             Object.keys(tables).forEach(id => {
                 rankedTables.push({
@@ -231,8 +234,8 @@ class ResultService {
 
             // Preparatory tasks
             engine.defineConfig( { 
-                fldWeights: {title: 5, rows: 1},
-                bm25Params: {k1: 1.2, b: 0.75, k: 1}
+                fldWeights: {title: 10, rows: 1},
+                bm25Params: {k1: 1.2, b: 0.4, k: 1}
             });
     
             engine.definePrepTasks(pipe);
