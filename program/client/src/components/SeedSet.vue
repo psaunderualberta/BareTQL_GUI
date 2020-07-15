@@ -82,8 +82,8 @@
                     <!-- Display for query results -->
                     <form style="font-size: 0.9em;">
                         <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
-                            <!-- Row title, clicking on title reveals rows of table -->
-                            <!-- /* https://codepen.io/Idered/pen/AeBgF */ -->
+                            <!-- Row title, clicking on title reveals rows of table
+                                https://codepen.io/Idered/pen/AeBgF */ -->
                             <input type="checkbox" class="read-more-state" :id="'_'+table_rank">
                             
                             <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
@@ -173,11 +173,11 @@ export default {
 
     data: function() {
         return {
+            document: document,  
+            selectedRows: [],
             keywords: '',
             results: "",
             errors: [],
-            selectedRows: [],
-            document: document,  
         }
     },
 
@@ -228,7 +228,7 @@ export default {
                 })     
             } else {
                 if (this.keywords.length === 0) {
-                    this.errors.push(0); // Need at least one item, doesn't matter what
+                    this.errors.push(0); /* Need at least one item, doesn't matter what it is. */
                 }
 
             }
@@ -236,8 +236,7 @@ export default {
 
         postSeedSet() {
             /* Set the seed set attribute on the back-end,
-             * emit event to change the page's mode
-             */
+             * emit event to change the page's mode */
             var tableIDs = [];
             var rowIDs = [];
             this.selectedRows.forEach(row => {
@@ -269,7 +268,7 @@ export default {
              * https://x-team.com/blog/highlight-text-vue-regex/
              * Accessed June 9th, 2020
              */
-            return str.replace(new RegExp(`(?:^|[^a-zA-Z])(?:${keywords.split(/ *, */).join('|')})(?=[^a-zA-Z]|$)`, 'gi'), match => {
+            return str.replace(new RegExp(`(?<=^|[^a-zA-Z])(?:${keywords.split(/ *, */).join('|')})(?=[^a-zA-Z]|$)`, 'gi'), match => {
                 return '<strong>' + match + '</strong>'
             })
         },

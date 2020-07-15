@@ -15,7 +15,7 @@
             <button @click="goBack">Return to Keyword Search</button>
         </div>
         <div class="separate-components centering">
-            <h3>Current Table: {{ table.length }} rows, {{ numCols }} columns, {{ nullCount }} null values</h3>
+            <h3>Seed Set: {{ table.length }} rows, {{ numCols }} columns, {{ nullCount }} null values</h3>
 
             <div v-if="deletions.length > 0">
                 <button v-on:submit.prevent type="submit" @click="deleteCols">Click to delete columns {{ deletions }}</button>
@@ -45,12 +45,12 @@
                         <td v-for="col in numCols" :key="col">
                             <div style="text-align: left;">
                                 <span>
-                                    <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
-                                    <label :for="'delete'+col" style="padding: 0.5%">X</label>
+                                    <input type="checkbox" :id="'unique'+col" :value="col" v-model="uniqueCols">
+                                    <label :for="'unique'+col" style="padding: 0.5%;">Unique</label>
                                 </span>
                                 <span style="float: right;">
-                                    <input type="checkbox" :id="'unique'+col" :value="col" v-model="uniqueCols">
-                                    <label :for="'unique'+col" style="padding-right: 1%;">Unique</label>
+                                    <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions">
+                                    <label :for="'delete'+col" style="padding-right: 1%">X</label>
                                 </span>
                             </div>
                             <div style="float: none;">
@@ -84,7 +84,6 @@
             <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
                 Confirm Selection
             </button>
-
         </div>
         
         <!-- Result of Set Expansion -->
@@ -199,7 +198,7 @@ export default {
                 if (data.length > 0 && data[0].length > 0) {
                     data.forEach(row => {
                         row = row.split(' || ')
-                        cellCount += row.length;
+                        cellCount += row.filter(cell => cell !== "NULL").length;
                         this.numCols = Math.max(this.numCols, row.length);
         
                         tmp.push(row) 

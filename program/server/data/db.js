@@ -51,9 +51,6 @@ class Database {
 
         this.cellSep = ' || '
 
-        // var jaroSim = function(str1, str2) {return similarity(str1, str2)}
-        // var diceSim = function(str1, str2) {return 1 - dice(str1, str2)} // Perfect match is 0, rather than 1
-
         /* Aggregate function to turn col into array 
          * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
          * Accessed June 23rd, 2020 */
@@ -80,7 +77,11 @@ class Database {
         this.db.function('SEM', (arr) => {
             arr = JSON.parse(arr).map(num => Number(num))
 
-            return statistics.standardDeviation(arr) / (Math.sqrt(arr.length) + 1e-5) // Avoid division by 0
+            if (arr.length === 0) { // Entire column is NULL, don't want in result
+                return Infinity
+            }
+
+            return statistics.standardDeviation(arr) / (Math.sqrt(arr.length)) // division by 0 won't happen
         })
 
         this.db.function('OVERLAP_SIM', (ssCol, keyCol) => {
@@ -90,14 +91,9 @@ class Database {
             var colSet = new Set([...keyCol]);
             return new Set(ssCol.filter(value => colSet.has(value))).size / ssCol.length
         })
-
-        this.db.function('isNumber', (num) => 1 - Number(isNaN(num)))
-
-        // this.db.function('jaro', (str1, str2) => similarity(str1, str2));
-        // this.db.function('dice', (str1, str2) => dice(str1, str2))
     }
 
-    keywordSearch(keywords, params = []) {
+    keywordSearch(keywords) {
         /* This object queries the database for keywords found in cells, headers, 
             titles, and captions and returns the rows that matched
     
@@ -114,13 +110,8 @@ class Database {
 
         var keywordQMarks = this.getQMarks(keywords);
 
-        /* https://stackoverflow.com/questions/21223357/sql-request-with-case-in-order-by-throws-1-1st-order-by-term-does-not-match-a
-         * Accessed June 9th 2020
-         * Custom ordering of columns, by location
-         * 
-         * Nested query is due to same keyword appearing in multiple
-         * locations on same table, leading to repeated rows in output
-         */
+        /* Nested query is due to same keyword appearing in multiple
+         * locations on same table, leading to repeated rows in output */
         const stmt = this.db.prepare(`
             SELECT r.table_id, title, row_id, value, rowCount
             FROM
@@ -131,10 +122,7 @@ class Database {
                     FROM keywords_cell_header 
                     WHERE keyword IN ${keywordQMarks}
                 ) k NATURAL JOIN titles t NATURAL JOIN cells c
-                WHERE k.table_id = t.table_id 
-                AND t.table_id = c.table_id
-                AND k.row_id = c.row_id
-                AND c.location != 'header'
+                WHERE c.location != 'header'
                 GROUP BY t.table_id, c.row_id
     
                 UNION
@@ -947,7 +935,7 @@ class Database {
         var columnSets = [];
         var uniqueRows = [];
         var rrIndex = 0;
-        for (const cell of this.seedSet['uniqueCols']) columnSets.push(new Set())
+        for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows.length < 10 && rrIndex < rankedRows.length) {
 
