@@ -455,6 +455,8 @@ class Database {
                     .then((results) => {
                         return this.getNumericalMatches(results)
                     }).then((results) => {
+                        return this.getNULLMatches(results)
+                    }).then((results) => {
                         return this.getPermutedRows(results)
                     }).then((results) => {
                         resolve(this.rankResults(results));
@@ -493,6 +495,7 @@ class Database {
          * - Promise that resolves if querying is successful, rejects otherwise */
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var curCumProbs = [];
@@ -519,6 +522,13 @@ class Database {
             WHERE type = 'text'
             GROUP BY table_id
             HAVING COUNT(DISTINCT col_id) >= ?
+
+            INTERSECT 
+
+            SELECT table_id
+            FROM cells
+            GROUP BY table_id
+            HAVING MAX(col_id) >= ?
             `
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -547,7 +557,7 @@ class Database {
                 /* First step of table filtering: look for overlap in key column */
                 if (firstTextCol < this.seedSet['types'].length) {
                     var ssKeyCol = JSON.stringify(ssCols[firstTextCol])
-                    params = [firstTextCol, ssKeyCol, numTextual]
+                    params = [firstTextCol, ssKeyCol, numTextual, numNumerical + numTextual + numNULL - 1]
                     if (numNumerical) {
                         stmt += `
                             INTERSECT
@@ -615,7 +625,6 @@ class Database {
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
 
-                    /* Possibly only run this condition if numerical querying returned nothing */
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
                             curCumProbs = [];
@@ -660,6 +669,7 @@ class Database {
 
         var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
         var numTextual = this.seedSet['types'].filter(type => type === 'text').length
+        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var column = [];
@@ -686,6 +696,8 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 var tables = tableSaver['tables']
+
+                /* No textual columns in seed set */
                 if (ssCols.length > 0 && tables.length === 0) {
                     column = JSON.stringify(ssCols[0])
 
@@ -705,11 +717,18 @@ class Database {
                         AND c.value != ''
                         GROUP BY table_id, col_id
                         HAVING T_TEST(?, toArr(value)) >= ?
-                        AND SEM(toArr(value)) < ?;
+                        AND SEM(toArr(value)) < ?
+
+                        INTERSECT 
+
+                        SELECT table_id
+                        FROM cells
+                        GROUP BY table_id
+                        HAVING MAX(col_id) >= ?;
                     `)
 
                     this.all(stmt,
-                        [numNumerical, column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0]],
+                        [numNumerical, column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0], numNULL + numNumerical + numTextual - 1],
                         tables)
 
                     for (let i = 0; i < tables.length; i++) {
@@ -805,6 +824,52 @@ class Database {
         })
     }
 
+    getNULLMatches(tables) {
+        /* If there are any columns in the seed set which are entirely filled with
+         * 'NULL', this function will find the first 'n' columns in ascending order which 
+         * is not already in the numericalPerm or textualPerm for the table, and add them
+         * to the table's 'NULLperm'; where 'n' is the number of NULL columns in the seed set
+         * 
+         * Arguments:
+         * - tables: The list of table objects after textual and numerical column mapping
+         * 
+         * Returns:
+         * - Promise which resolves if querying is successful, rejects otherwise */
+        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
+        var indices;
+
+        var stmt;
+
+        
+        return new Promise((resolve, reject) => {
+            try {
+                /* If there are no NULL columns, bypass the querying */
+                if (numNULL){
+                    for (let table of tables) {
+                        table['NULLperm'] = []
+                        indices = `(${table['numericalPerm'].concat(table['textualPerm'])})`
+
+                        stmt = this.db.prepare(`
+                            SELECT col_id
+                            FROM cells
+                            WHERE table_id = ?
+                            AND col_id NOT IN ${indices}
+                            GROUP BY col_id
+                            LIMIT ?;
+                        `)
+
+                        this.all(stmt, [table['table_id'], numNULL], table['NULLperm'])
+                        table['NULLperm'] = table['NULLperm'].map(col => {return col['col_id']})
+                    }
+                }
+
+                resolve(tables);
+            } catch (error) {
+                reject(error)
+            }
+        })
+    }
+
     getPermutedRows(tables) {
         /* Retrieves the rows of the tables found in the previous step,
          * permuted to the 'best' possible permutations found in 
@@ -823,6 +888,7 @@ class Database {
             try {
                 var nP = 0;
                 var tP = 0;
+                var nullP = 0;
 
                 for (let table of tables) {
                     table['rows'] = [];
@@ -831,13 +897,17 @@ class Database {
                     var ignoredCols = table['textualPerm'].length + table['numericalPerm'].length + 1
                     nP = 0;
                     tP = 0;
+                    nullP = 0;
+
                     cases = "";
 
                     for (let i = 0; i < this.seedSet['types'].length; i++) {
                         if (this.seedSet['types'][i] === 'text')
                             cases += `WHEN ${table['textualPerm'][tP++]} THEN ${i}\n`
-                        else
+                        else if (this.seedSet['types'][i] === 'numerical')
                             cases += `WHEN ${table['numericalPerm'][nP++]} THEN ${i}\n`
+                        else
+                            cases += `WHEN ${table['NULLperm'][nullP++]} THEN ${i}\n`
                     }
 
                     // Columns that are not in the column range of the seed set are ignored.
@@ -1015,6 +1085,7 @@ class Database {
         var rows = table.map(row => row.split(' || '))
 
         for (let i = 0; i < rows[0].length; i++) {
+            column = [];
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
                     column.push(rows[j][i])
@@ -1024,6 +1095,8 @@ class Database {
 
             if (column.indexOf(true) === -1 && column.length > 0)
                 types.push("numerical")
+            else if (column.length === 0)
+                types.push("NULL")
             else
                 types.push("text");
         }
