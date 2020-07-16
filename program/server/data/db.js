@@ -457,23 +457,23 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 this.getMatchingTables()
-                .then((results) => {
-                    return this.getTextualMatches(results)
-                }).then((results) => {
-                    return this.getNumericalMatches(results)
-                }).then((results) => {
-                    return this.getNULLMatches(results)
-                }).then((results) => {
-                    return this.getPermutedRows(results)
-                }).then((results) => {
-                    return this.rankResults(results);
-                }).then((results) => {
-                    resolve(results)
-                })
-                .catch((error) => {
-                    console.log(error);
-                    resolve([])
-                })
+                    .then((results) => {
+                        return this.getTextualMatches(results)
+                    }).then((results) => {
+                        return this.getNumericalMatches(results)
+                    }).then((results) => {
+                        return this.getNULLMatches(results)
+                    }).then((results) => {
+                        return this.getPermutedRows(results)
+                    }).then((results) => {
+                        return this.rankResults(results);
+                    }).then((results) => {
+                        resolve(results)
+                    })
+                    .catch((error) => {
+                        console.log(error);
+                        resolve([])
+                    })
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -499,11 +499,11 @@ class Database {
         var params = [];
         var stmt = "";
 
-        var getFirstCol = function(seedSet, type, slider, arr) {
+        var getFirstCol = function (seedSet, type, slider, arr) {
             for (let i = 0; i < seedSet['types'].length; i++) {
                 if (seedSet['types'][i] !== type)
                     continue
-    
+
                 slider.push(seedSet['sliders'][i])
                 for (let j = 0; j < rows.length; j++) {
                     if (rows[j][i] !== "NULL")
@@ -528,6 +528,7 @@ class Database {
                             SELECT table_id
                             FROM cells NATURAL JOIN columns
                             WHERE type = 'text'
+                            AND col_id = 0
                             GROUP BY table_id, col_id
                             HAVING OVERLAP_SIM(?, toArr(value)) > ?
                         )
@@ -539,7 +540,7 @@ class Database {
                     `
                     params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
                 }
-        
+
                 if (this.seedSet['numNumerical']) {
                     stmt += `
                         SELECT DISTINCT table_id
@@ -556,14 +557,13 @@ class Database {
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING T_TEST(?, toArr(value)) >= ?
-                        AND SEM(toArr(value)) < ?
+                        HAVING T_TEST(?, toArr(value)) >= 0
         
                         INTERSECT
                     `
-                    params.push(...[this.seedSet['numNumerical'], numCol, numSlider / 100, 100 - numSlider])
+                    params.push(...[this.seedSet['numNumerical'], numCol])
                 }
-        
+
                 stmt += `
                     SELECT table_id
                     FROM cells
@@ -571,10 +571,10 @@ class Database {
                     HAVING MAX(col_id) >= ?;
                 `
                 params.push(this.seedSet['types'].length - 1)
-        
+
                 stmt = this.db.prepare(stmt)
                 this.all(stmt, params, tables)
-                
+
                 resolve(tables)
             } catch (error) {
                 reject(error)
@@ -692,7 +692,7 @@ class Database {
 
                     if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
                         tables[i] = bestPerm
-                    else   
+                    else
                         tables.splice(i--, 1)
                 }
 
@@ -728,7 +728,7 @@ class Database {
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'numerical')
                 continue
-                 
+
             ssCols.push([])
             sliderIndices.push(this.seedSet['sliders'][i])
             column = ssCols[ssCols.length - 1]
@@ -779,9 +779,7 @@ class Database {
                     table['numericalPerm'] = []
                     table['chiTestStat'] = Infinity;
 
-                    if (!this.seedSet['numTextual'] || (this.seedSet['numNumerical']
-                        && cols['colIDs'].length <= 20
-                        && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 300))))) {
+                    if (!this.seedSet['numTextual'] || (this.seedSet['numNumerical'] && cols['colIDs'].length <= 20)) {
                         curChiTestStat = 0;
 
                         /* Iterate over all permutations of the columns, 
@@ -834,11 +832,11 @@ class Database {
          * - Promise which resolves if querying is successful, rejects otherwise */
         var indices;
         var stmt;
-        
+
         return new Promise((resolve, reject) => {
             try {
                 /* If there are no NULL columns, bypass the querying */
-                if (this.seedSet['numNULL']){
+                if (this.seedSet['numNULL']) {
                     for (let table of tables) {
                         table['NULLperm'] = []
                         indices = `(${table['numericalPerm'].concat(table['textualPerm'])})`
@@ -853,7 +851,7 @@ class Database {
                         `)
 
                         this.all(stmt, [table['table_id'], this.seedSet['numNULL']], table['NULLperm'])
-                        table['NULLperm'] = table['NULLperm'].map(col => {return col['col_id']})
+                        table['NULLperm'] = table['NULLperm'].map(col => { return col['col_id'] })
                     }
                 }
 
