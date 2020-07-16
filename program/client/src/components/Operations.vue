@@ -265,7 +265,6 @@ export default {
 
 <style scoped>
 
-
 .compress {
     width: 50%;
     justify-content: center;

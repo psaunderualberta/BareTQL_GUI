@@ -254,6 +254,10 @@ class Database {
 
         if (changeSeed)
             this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
+
+        this.seedSet['numNumerical'] = this.seedSet['types'].filter(type => type === 'numerical').length
+        this.seedSet['numTextual'] = this.seedSet['types'].filter(type => type === 'text').length
+        this.seedSet['numNULL'] = this.seedSet['types'].filter(type => type === 'NULL').length
     }
 
     groupCols(rows) {
@@ -492,9 +496,6 @@ class Database {
          * 
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
-        var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
-        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
-        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var curCumProbs = [];
@@ -556,8 +557,8 @@ class Database {
                 /* First step of table filtering: look for overlap in key column */
                 if (firstTextCol < this.seedSet['types'].length) {
                     var ssKeyCol = JSON.stringify(ssCols[firstTextCol])
-                    params = [firstTextCol, ssKeyCol, numTextual, numNumerical + numTextual + numNULL - 1]
-                    if (numNumerical) {
+                    params = [firstTextCol, ssKeyCol, this.seedSet['numTextual'], this.seedSet['types'].length - 1]
+                    if (this.seedSet['numNumerical']) {
                         stmt += `
                             INTERSECT
                                         
@@ -566,7 +567,7 @@ class Database {
                             WHERE type = 'numerical'
                             GROUP BY table_id
                             HAVING COUNT(DISTINCT col_id) >= ?;`
-                        params.push(numNumerical)
+                        params.push(this.seedSet['numNumerical'])
                     }
 
                     stmt = this.db.prepare(stmt)
@@ -625,7 +626,7 @@ class Database {
                     * finding the one that returns the lowest cumulative overlap similarity */
 
                     if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
-                        combinatorics.permutation(cols['colIDs'], numTextual).forEach(perm => {
+                        combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
                             curCumProbs = [];
 
                             for (let i = 0; i < ssCols.length; i++) {
@@ -642,7 +643,7 @@ class Database {
                         })
                     }
 
-                    if (!numTextual || bestPerm['textualPerm'].length !== 0)
+                    if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
                         tables.push(bestPerm)
                 }
 
@@ -665,10 +666,6 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if query is successful, rejects otherwise.*/
-
-        var numNumerical = this.seedSet['types'].filter(type => type === 'numerical').length
-        var numTextual = this.seedSet['types'].filter(type => type === 'text').length
-        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var column = [];
@@ -688,14 +685,8 @@ class Database {
             }
         }
 
-        /* For some unknown reason, 'tables' is undefined inside the following 
-        promise and so we define an object in which to store it */
-        var tableSaver = { tables: tables };
-
         return new Promise((resolve, reject) => {
             try {
-                var tables = tableSaver['tables']
-
                 /* No textual columns in seed set */
                 if (ssCols.length > 0 && tables.length === 0) {
                     column = JSON.stringify(ssCols[0])
@@ -731,7 +722,7 @@ class Database {
                         tableSaver['tables'])
 
                     this.all(stmt,
-                        [numNumerical, column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0], numNULL + numNumerical + numTextual - 1],
+                        [this.seedSet['numNumerical'], column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0], this.seedSet['types'].length - 1],
                         tables)
 
                     for (let i = 0; i < tables.length; i++) {
@@ -745,7 +736,7 @@ class Database {
                 var cols = [];
                 var curChiTestStat;
 
-                for (let i = 0; i < numNumerical; i++)
+                for (let i = 0; i < this.seedSet['numNumerical']; i++)
                     pValDP.push([])
                 /* Get the best permutation for numerical columns for each table */
                 for (let i = 0; i < tables.length; i++) {
@@ -770,7 +761,7 @@ class Database {
                     }
 
                     /* Re-initialize dynamic programming array */
-                    this.resetDPArr(pValDP, numNumerical, Math.max(...cols['colIDs']))
+                    this.resetDPArr(pValDP, this.seedSet['numNumerical'], Math.max(...cols['colIDs']))
 
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
@@ -785,7 +776,7 @@ class Database {
                     table['numericalPerm'] = []
                     table['chiTestStat'] = Infinity;
 
-                    if (!numTextual || (numNumerical
+                    if (!this.seedSet['numTextual'] || (this.seedSet['numNumerical']
                         && cols['colIDs'].length <= 20
                         && pValDP.every(col => col.some(pVal => pVal >= Math.log(sliderIndices[0] / 300))))) {
                         curChiTestStat = 0;
@@ -793,7 +784,7 @@ class Database {
                         /* Iterate over all permutations of the columns, 
                         * finding the one that returns the highest chi^2 test statistic
                         * by using Fisher's method */
-                        combinatorics.permutation(cols['colIDs'], numNumerical).forEach(idPerm => {
+                        combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
                             curChiTestStat = 0;
 
                             for (let i = 0; i < ssCols.length; i++) {
@@ -810,11 +801,11 @@ class Database {
                         })
                     }
 
-                    if (numNumerical && table['numericalPerm'].length === 0)
+                    if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
                         tables.splice(i--, 1)
 
                     /* Set a 'base score' for the table to be used when ranking rows */
-                    else if (numNumerical)
+                    else if (this.seedSet['numNumerical'])
                         table['score'] = table['chiTestStat'] + table['textScore']
                     else
                         table['score'] = table['textScore']
@@ -838,16 +829,13 @@ class Database {
          * 
          * Returns:
          * - Promise which resolves if querying is successful, rejects otherwise */
-        var numNULL = this.seedSet['types'].filter(type => type === 'NULL').length
         var indices;
-
         var stmt;
-
         
         return new Promise((resolve, reject) => {
             try {
                 /* If there are no NULL columns, bypass the querying */
-                if (numNULL){
+                if (this.seedSet['numNULL']){
                     for (let table of tables) {
                         table['NULLperm'] = []
                         indices = `(${table['numericalPerm'].concat(table['textualPerm'])})`
@@ -861,7 +849,7 @@ class Database {
                             LIMIT ?;
                         `)
 
-                        this.all(stmt, [table['table_id'], numNULL], table['NULLperm'])
+                        this.all(stmt, [table['table_id'], this.seedSet['numNULL']], table['NULLperm'])
                         table['NULLperm'] = table['NULLperm'].map(col => {return col['col_id']})
                     }
                 }

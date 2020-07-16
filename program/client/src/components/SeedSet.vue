@@ -45,112 +45,121 @@
             </form>
         </div>
 
+        <div style="display: flex;">
+            <!-- LHS of Page -->
+            <div class="page">
+                <div class="separate-components">
+                    <div class="centering">
+                        <Instruction ref="instruction-3" index="3">
+                            <template #shown>
+                                <h3>Results</h3>
+                            </template>
+                            
+                            <template #hidden>
+                                <p>
+                                    This the the 'Results' tab, where the results of your query will be shown, separated into tables. <br>
+                                    Click on the title of a table to see its rows, and click on a row to add it to your seed set.
+                                </p>
+                            </template>
+                        </Instruction>
 
-        <!-- LHS of Page -->
-        <div class="page">
-            <div class="separate-components">
-                <div class="centering">
-                    <Instruction ref="instruction-3" index="3">
-                        <template #shown>
-                            <h3>Results</h3>
-                        </template>
-                        
-                        <template #hidden>
-                            <p>
-                                This the the 'Results' tab, where the results of your query will be shown, separated into tables. <br>
-                                Click on the title of a table to see its rows, and click on a row to add it to your seed set.
-                            </p>
-                        </template>
-                    </Instruction>
 
+                    </div>
 
-                </div>
+                    <!-- List of tables for results -->
+                    <ul v-if="Object.keys(results).length > 0">
 
-                <!-- List of tables for results -->
-                <ul v-if="Object.keys(results).length > 0">
+                        <!-- Summary of results -->
+                        <p v-if="Object.keys(results).length === 20" class="centering">
+                            These are the top 20 tables that match the keywords '{{ keywords }}'. <br>
+                            Click on a title to view the table's rows.
+                        </p>
+                        <p v-else class="centering">
+                            There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'. <br>
+                            Click on a title to view the table's rows.
+                        </p>
 
-                    <!-- Summary of results -->
-                    <p v-if="Object.keys(results).length === 20" class="centering">
-                        These are the top 20 tables that match the keywords '{{ keywords }}'. <br>
-                        Click on a title to view the table's rows.
+                        <!-- Display for query results -->
+                        <form style="font-size: 0.9em;">
+                            <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
+                                <!-- Row title, clicking on title reveals rows of table
+                                    https://codepen.io/Idered/pen/AeBgF */ -->
+                                <input type="checkbox" class="read-more-state" :id="'_'+table_rank">
+                                
+                                <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
+                                    v-html="'List of '
+                                            + makeKeywordsBold(table['title'], keywords) 
+                                            + ': ('
+                                            + Object.keys(results[table_rank]['rows']).length
+                                            + (Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ')
+                                            + results[table_rank]['rowCount']
+                                            + ' rows)'">
+                                </label>
+                                    
+                                <!-- Rows of table -->
+                                <div class="read-more-wrap">
+                                <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
+                                        <input type="checkbox" :id="table_rank+'-'+rowID" 
+                                                :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
+                                        <label :for="table_rank+'-'+rowID"
+                                            v-html="'('
+                                                    + makeKeywordsBold(rowContent, keywords)
+                                                    + ')'">
+                                        </label>
+                                    </p> 
+                                </div>
+                            </li>
+                        </form>
+                    </ul>
+                    <!-- Only upon initialization of page -->
+                    <p v-else-if="typeof results === 'string'" class='centering'> 
+                        Enter keywords and see the rows in our database which match!
                     </p>
                     <p v-else class="centering">
-                        There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'. <br>
-                        Click on a title to view the table's rows.
+                        No results for the previous query.
                     </p>
-
-                    <!-- Display for query results -->
-                    <form style="font-size: 0.9em;">
-                        <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
-                            <!-- Row title, clicking on title reveals rows of table
-                                https://codepen.io/Idered/pen/AeBgF */ -->
-                            <input type="checkbox" class="read-more-state" :id="'_'+table_rank">
-                            
-                            <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
-                                v-html="'List of '
-                                        + makeKeywordsBold(table['title'], keywords) 
-                                        + ': ('
-                                        + Object.keys(results[table_rank]['rows']).length
-                                        + (Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ')
-                                        + results[table_rank]['rowCount']
-                                        + ' rows)'">
-                            </label>
-                                
-                            <!-- Rows of table -->
-                            <div class="read-more-wrap">
-                               <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
-                                    <input type="checkbox" :id="table_rank+'-'+rowID" 
-                                            :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
-                                    <label :for="table_rank+'-'+rowID"
-                                        v-html="'('
-                                                + makeKeywordsBold(rowContent, keywords)
-                                                + ')'">
-                                    </label>
-                                </p> 
-                            </div>
-                        </li>
-                    </form>
-                </ul>
-                <!-- Only upon initialization of page -->
-                <p v-else-if="typeof results === 'string'" class='centering'> 
-                    Enter keywords and see the rows in our database which match!
-                </p>
-                <p v-else class="centering">
-                    No results for the previous query.
-                </p>
+                </div>
             </div>
-        </div>
 
-        <!-- RHS of Webpage -->
-        <div class="page">
+            <!-- RHS of Webpage -->
+            <div class="page">
+                <div class="sticky">
 
-            <!-- Display for selected seed set rows -->
-            <div class="separate-components centering">
-                <Instruction ref="instruction-4" index="4">
-                    <template #shown>
-                        <h3>Seed Set</h3>
-                    </template>
+                    <!-- Display for selected seed set rows -->
+                    <div class="separate-components centering">
+                        <Instruction ref="instruction-4" index="4">
+                            <template #shown>
+                                <h3>Seed Set</h3>
+                            </template>
 
-                    <template #hidden>
-                        <p>
-                            This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
-                            click the button below the table to move to the next portion of the app: Set Expansion.
+                            <template #hidden>
+                                <p>
+                                    This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
+                                    click the button below the table to move to the next portion of the app: Set Expansion.
+                                </p>
+                            </template>
+
+                            <template #button-text>
+                                End Tutorial
+                            </template>
+
+                        </Instruction>
+                        <p v-if="table['numRows'] === 0">
+                            No seed set rows have been selected
                         </p>
-                    </template>
+                        <div v-else>
 
-                    <template #button-text>
-                        End Tutorial
-                    </template>
+                            <!-- Table content -->
+                            <UserTable :table="table['rows']" :allowSelection="false"/>
+                            <button @click="postSeedSet">Use as Seed Set</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Fills up rest of 'page', so the seed set has 
+                    something to slide overtop. -->
+                <div>
 
-                </Instruction>
-                <p v-if="table['numRows'] === 0">
-                    No seed set rows have been selected
-                </p>
-                <div v-else>
-
-                    <!-- Table content -->
-                    <UserTable :table="table['rows']" :allowSelection="false"/>
-                    <button @click="postSeedSet">Use as Seed Set</button>
                 </div>
             </div>
         </div>

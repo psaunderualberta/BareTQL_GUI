@@ -72,6 +72,11 @@ input[type=checkbox]:checked + label {
     opacity: 0.5;
 }
 
+.sticky {
+    position: sticky;
+    top: 2%;
+}
+
 .deactivate {
     opacity: 0.5;
 }
