@@ -224,6 +224,8 @@ class Database {
                         this.seedSet['sliders'].push(50);
                     }
 
+
+
                     resolve()
                 })
                 .catch((err) => {
@@ -454,20 +456,24 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                this.getTextualMatches()
-                    .then((results) => {
-                        return this.getNumericalMatches(results)
-                    }).then((results) => {
-                        return this.getNULLMatches(results)
-                    }).then((results) => {
-                        return this.getPermutedRows(results)
-                    }).then((results) => {
-                        resolve(this.rankResults(results));
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                        resolve([])
-                    })
+                this.getMatchingTables()
+                .then((results) => {
+                    return this.getTextualMatches(results)
+                }).then((results) => {
+                    return this.getNumericalMatches(results)
+                }).then((results) => {
+                    return this.getNULLMatches(results)
+                }).then((results) => {
+                    return this.getPermutedRows(results)
+                }).then((results) => {
+                    return this.rankResults(results);
+                }).then((results) => {
+                    resolve(results)
+                })
+                .catch((error) => {
+                    console.log(error);
+                    resolve([])
+                })
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -483,7 +489,100 @@ class Database {
 
     }
 
-    getTextualMatches() {
+    getMatchingTables() {
+        var rows = this.seedSet['rows'].map(row => row.split(' || '));
+        var textSlider = [];
+        var numSlider = [];
+        var textCol = [];
+        var numCol = [];
+        var tables = [];
+        var params = [];
+        var stmt = "";
+
+        var getFirstCol = function(seedSet, type, slider, arr) {
+            for (let i = 0; i < seedSet['types'].length; i++) {
+                if (seedSet['types'][i] !== type)
+                    continue
+    
+                slider.push(seedSet['sliders'][i])
+                for (let j = 0; j < rows.length; j++) {
+                    if (rows[j][i] !== "NULL")
+                        arr.push(rows[j][i])
+                }
+                break
+            }
+        }
+
+        getFirstCol(this.seedSet, 'text', textSlider, textCol)
+        getFirstCol(this.seedSet, 'numerical', numSlider, numCol)
+
+        textSlider = textSlider[0]; numSlider = numSlider[0];
+        textCol = JSON.stringify(textCol); numCol = JSON.stringify(numCol.map(num => Number(num)));
+
+        return new Promise((resolve, reject) => {
+            try {
+                if (this.seedSet['numTextual']) {
+                    stmt += `
+                        SELECT table_id
+                        FROM columns NATURAL JOIN (
+                            SELECT table_id
+                            FROM cells NATURAL JOIN columns
+                            WHERE type = 'text'
+                            GROUP BY table_id, col_id
+                            HAVING OVERLAP_SIM(?, toArr(value)) > ?
+                        )
+                        WHERE type = 'text'
+                        GROUP BY table_id
+                        HAVING COUNT(DISTINCT col_id) >= ?
+        
+                        INTERSECT
+                    `
+                    params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
+                }
+        
+                if (this.seedSet['numNumerical']) {
+                    stmt += `
+                        SELECT DISTINCT table_id
+                        FROM cells c NATURAL JOIN columns col    
+                        NATURAL JOIN
+                        (
+                            SELECT table_id
+                            FROM columns
+                            WHERE type = 'numerical'
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
+                        )
+                        WHERE col.type = 'numerical' 
+                        AND c.location != 'header'
+                        AND c.value != ''
+                        GROUP BY table_id, col_id
+                        HAVING T_TEST(?, toArr(value)) >= ?
+                        AND SEM(toArr(value)) < ?
+        
+                        INTERSECT
+                    `
+                    params.push(...[this.seedSet['numNumerical'], numCol, numSlider / 100, 100 - numSlider])
+                }
+        
+                stmt += `
+                    SELECT table_id
+                    FROM cells
+                    GROUP BY table_id
+                    HAVING MAX(col_id) >= ?;
+                `
+                params.push(this.seedSet['types'].length - 1)
+        
+                stmt = this.db.prepare(stmt)
+                this.all(stmt, params, tables)
+                
+                resolve(tables)
+            } catch (error) {
+                reject(error)
+            }
+        })
+    }
+
+    getTextualMatches(tables) {
         /* Gets the texutal matches and permutes the columns for all
          * textual seed set columns. If there is at least one numerical column in 
          * the seed set, then we use the tables found in the 
@@ -499,37 +598,14 @@ class Database {
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var curCumProbs = [];
-        var tables = [];
         var ssCols = [];
         var pValDP = [];
         var cols = [];
-        var ids = [];
         var bestPerm;
         var permSet;
         var column;
-        var params;
         var pass;
-
-        var stmt = `SELECT table_id
-            FROM columns NATURAL JOIN (
-                SELECT table_id
-                FROM cells NATURAL JOIN columns
-                WHERE col_id = ?
-                AND type = 'text'
-                GROUP BY table_id
-                HAVING OVERLAP_SIM(?, toArr(value)) > 0
-            )
-            WHERE type = 'text'
-            GROUP BY table_id
-            HAVING COUNT(DISTINCT col_id) >= ?
-
-            INTERSECT 
-
-            SELECT table_id
-            FROM cells
-            GROUP BY table_id
-            HAVING MAX(col_id) >= ?
-            `
+        var stmt;
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'text')
@@ -550,43 +626,14 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
 
-                var firstTextCol = 0
-                while (firstTextCol < this.seedSet['types'].length && this.seedSet['types'][firstTextCol] !== 'text')
-                    firstTextCol++
-
-                /* First step of table filtering: look for overlap in key column */
-                if (firstTextCol < this.seedSet['types'].length) {
-                    var ssKeyCol = JSON.stringify(ssCols[firstTextCol])
-                    params = [firstTextCol, ssKeyCol, this.seedSet['numTextual'], this.seedSet['types'].length - 1]
-                    if (this.seedSet['numNumerical']) {
-                        stmt += `
-                            INTERSECT
-                                        
-                            SELECT table_id
-                            FROM columns
-                            WHERE type = 'numerical'
-                            GROUP BY table_id
-                            HAVING COUNT(DISTINCT col_id) >= ?;`
-                        params.push(this.seedSet['numNumerical'])
-                    }
-
-                    stmt = this.db.prepare(stmt)
-
-                    this.all(stmt, params, ids)
-
-                } else {
-                    resolve([]) /* No textual columns in seed set */
-                }
-
-
                 /* The steps required to find the permutations of the textual columns
                  * are quite similar to the steps for finding numerical column permutations.
                  * However, there are a few important differences that prevent the two operations
                  * from being combined into one function, such as the method used to score the permutations
                  * and the format required of the columns retrieved */
                 var result;
-                for (let i = 0; i < ids.length; i++) {
-                    result = ids[i]
+                for (let i = 0; i < tables.length; i++) {
+                    result = tables[i]
                     cols = [];
                     stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
@@ -644,7 +691,9 @@ class Database {
                     }
 
                     if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
-                        tables.push(bestPerm)
+                        tables[i] = bestPerm
+                    else   
+                        tables.splice(i--, 1)
                 }
 
                 resolve(tables)
@@ -670,6 +719,10 @@ class Database {
         var sliderIndices = [];
         var column = [];
         var ssCols = [];
+        var table;
+        var pValDP = [];
+        var cols = [];
+        var curChiTestStat;
         var stmt;
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -688,53 +741,6 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 /* No textual columns in seed set */
-                if (ssCols.length > 0 && tables.length === 0) {
-                    column = JSON.stringify(ssCols[0])
-
-                    stmt = this.db.prepare(`
-                        SELECT DISTINCT table_id
-                        FROM cells c NATURAL JOIN columns col    
-                        NATURAL JOIN
-                        (
-                            SELECT table_id
-                            FROM columns
-                            WHERE type = 'numerical'
-                            GROUP BY table_id
-                            HAVING COUNT(DISTINCT col_id) >= ?
-                        )
-                        WHERE col.type = 'numerical' 
-                        AND c.location != 'header'
-                        AND c.value != ''
-                        GROUP BY table_id, col_id
-                        HAVING T_TEST(?, toArr(value)) >= ?
-                        AND SEM(toArr(value)) < ?
-
-                        INTERSECT 
-
-                        SELECT table_id
-                        FROM cells
-                        GROUP BY table_id
-                        HAVING MAX(col_id) >= ?;
-                    `)
-    
-                    this.all(stmt,
-                        [numNumerical, column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0]],
-                        tableSaver['tables'])
-
-                    this.all(stmt,
-                        [this.seedSet['numNumerical'], column, (this.seedSet['sliders'][0] / 100), 100 - this.seedSet['sliders'][0], this.seedSet['types'].length - 1],
-                        tables)
-
-                    for (let i = 0; i < tables.length; i++) {
-                        tables[i]['textualPerm'] = [];
-                        tables[i]['textScore'] = 0;
-                    }
-                }
-
-                var table;
-                var pValDP = [];
-                var cols = [];
-                var curChiTestStat;
 
                 for (let i = 0; i < this.seedSet['numNumerical']; i++)
                     pValDP.push([])
@@ -766,10 +772,7 @@ class Database {
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
-                            if (statistics.standardDeviation(ssCols[i]) === 0 && statistics.standardDeviation(col) === 0)
-                                pValDP[i][cols['colIDs'][j]] = Math.log(0.98 * (Number(ssCols[i][0] === col[0])) + 0.01) // Map between 0.01 and 0.99 to avoid log(0)
-                            else
-                                pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col))
+                            pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col))
                         })
                     }
 
@@ -1110,7 +1113,10 @@ class Database {
             return 0 // Lowest p-value possible => worst result (want the best match)
 
         if (arr1.length === 1 && arr2.length === 1)
-            p = Number(arr1[0] === arr2[0])
+            p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
+
+        else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
+            p = 0.98 * (Number(arr1[0] === arr2[0])) + 0.01 // Map between 0.01 and 0.99 to avoid log(0)
 
         /* If only one row in seedSet's numerical col, use one-sample t-test */
         else if (arr1.length === 1)
