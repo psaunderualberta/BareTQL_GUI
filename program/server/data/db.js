@@ -214,7 +214,7 @@ class Database {
                     /* 'unpack' results of query */
                     this.seedSet['rows'] = this.seedSet['rows'].map(row => row['value'])
 
-                    this.cleanRows(true, true);
+                    this.cleanRows(true, false);
 
                     /* Set sliders to defaults */
                     for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
@@ -584,8 +584,6 @@ class Database {
                 stmt = this.db.prepare(stmt)
                 this.all(stmt, params, tables)
 
-                console.log(tables);
-
                 resolve(tables)
             } catch (error) {
                 reject(error)
@@ -648,6 +646,7 @@ class Database {
                         SELECT table_id, col_id, toArr(value) AS column
                         FROM cells c NATURAL JOIN columns col
                         WHERE col.type = 'text'
+                        AND c.value != ''
                         AND c.location != 'header'
                         AND table_id = ?
                         GROUP BY table_id, col_id
@@ -680,23 +679,21 @@ class Database {
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
 
-                    if (pValDP[0].some(overlapSimilarity => overlapSimilarity >= sliderIndices[0] / 100)) {
-                        combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
-                            curCumProbs = [];
+                    combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
+                        curCumProbs = [];
 
-                            for (let i = 0; i < ssCols.length; i++) {
-                                curCumProbs.push(pValDP[i][perm[i]])
-                            }
+                        for (let i = 0; i < ssCols.length; i++) {
+                            curCumProbs.push(pValDP[i][perm[i]])
+                        }
 
-                            pass = curCumProbs.every((val, i) => val >= sliderIndices[i] / 100)
-                            curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
+                        pass = curCumProbs.every((val, i) => val >= sliderIndices[i] / 100)
+                        curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
 
-                            if (pass && curCumProbs > bestPerm['textScore']) {
-                                bestPerm['textualPerm'] = perm;
-                                bestPerm['textScore'] = curCumProbs
-                            }
-                        })
-                    }
+                        if (pass && curCumProbs > bestPerm['textScore']) {
+                            bestPerm['textualPerm'] = perm;
+                            bestPerm['textScore'] = curCumProbs
+                        }
+                    })
 
                     if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
                         tables[i] = bestPerm
@@ -791,28 +788,26 @@ class Database {
                     table['numericalPerm'] = []
                     table['chiTestStat'] = Infinity;
 
-                    if (!this.seedSet['numTextual'] || (this.seedSet['numNumerical'] && cols['colIDs'].length <= 20)) {
+                    curChiTestStat = 0;
+
+                    /* Iterate over all permutations of the columns, 
+                    * finding the one that returns the highest chi^2 test statistic
+                    * by using Fisher's method */
+                    combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
                         curChiTestStat = 0;
 
-                        /* Iterate over all permutations of the columns, 
-                        * finding the one that returns the highest chi^2 test statistic
-                        * by using Fisher's method */
-                        combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
-                            curChiTestStat = 0;
+                        for (let i = 0; i < ssCols.length; i++) {
+                            curChiTestStat += pValDP[i][idPerm[i]]
+                        }
 
-                            for (let i = 0; i < ssCols.length; i++) {
-                                curChiTestStat += pValDP[i][idPerm[i]]
-                            }
+                        curChiTestStat *= -2;
 
-                            curChiTestStat *= -2;
+                        if (curChiTestStat < table['chiTestStat']) {
 
-                            if (curChiTestStat < table['chiTestStat']) {
-
-                                table['numericalPerm'] = idPerm;
-                                table['chiTestStat'] = curChiTestStat
-                            }
-                        })
-                    }
+                            table['numericalPerm'] = idPerm;
+                            table['chiTestStat'] = curChiTestStat
+                        }
+                    })
 
                     if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
                         tables.splice(i--, 1)
@@ -1010,7 +1005,7 @@ class Database {
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows.length < 10 && rrIndex < rankedRows.length) {
-            if (uniqueRows.indexOf(rankedRows[rrIndex].join(' || ')) !== -1)
+            if (uniqueRows.indexOf(rankedRows[rrIndex].join(' || ')) !== -1 || rankedRows[rrIndex].indexOf('NULL') > 0)
                 rrIndex++;
             /* No values in rankedRows[rrIndex] are in the uniqueCols' sets */
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows[rrIndex][col])).every(inSet => inSet === false)) {

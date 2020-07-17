@@ -20,7 +20,6 @@
 
                 <template #hidden>
                     <p>
-                        <br>
                         This is where you can enter keywords to search for in the database.<br>
                         Separate individual keywords by a comma, and then click the submit button below to run your query. Note
                         that common words like 'the' or 'and' will take longer to query, just because they are more common in the database.
@@ -137,7 +136,7 @@
                             <template #hidden>
                                 <p>
                                     This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
-                                    click the button below the table to move to the next portion of the app: Set Expansion.
+                                    click the "Use as Seed Set" button to begin the "Set Expansion" section of the application.
                                 </p>
                             </template>
 
@@ -161,7 +160,7 @@
                 </div>
                 
                 <!-- Fills up rest of 'page', so the seed set has 
-                    something to slide overtop. -->
+                    something over which to slide. -->
                 <div>
 
                 </div>
@@ -298,7 +297,6 @@ export default {
                 return '<strong>' + match + '</strong>'
             })
         },
-
     },
 
     computed: {
