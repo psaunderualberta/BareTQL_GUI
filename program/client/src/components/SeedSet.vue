@@ -88,12 +88,11 @@
                                 
                                 <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;">
                                     List of
-                                    <span v-html="makeKeywordsBold(table['title'], keywords)"></span>
-                                    : ({{ Object.keys(results[table_rank]['rows']).length }}
+                                    <span v-html="makeKeywordsBold(table['title'], keywords)"></span>:
+                                    ({{ Object.keys(results[table_rank]['rows']).length }}
                                     {{Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from '}}
-                                    {{results[table_rank]['rowCount']}}
-                                     rows)
-                                    <span v-if="isARowSelected(table['table_id'])">***</span>
+                                    {{results[table_rank]['rowCount']}} rows)
+                                    <span v-if="isTableInSS(table['table_id'])">***</span>
                                             
                                 </label>
                                     
@@ -278,10 +277,14 @@ export default {
         },
 
         isTableChecked(table_rank) {
+            /* Checks if table checkbox is checked, 
+             * allows for rendering of rows. */
             return this.clickedTables.indexOf(table_rank) !== -1
         },
 
-        isARowSelected(table_id) {
+        isTableInSS(table_id) {
+            /* Checks if a row from table_id is selected to
+             * be in the seed set, if it is we record it in the DOM */
             return this.selectedRows.some(row => row['tableID'] === table_id);
         },
 
