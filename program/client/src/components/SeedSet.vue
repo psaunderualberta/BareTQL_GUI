@@ -84,30 +84,33 @@
                             <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
                                 <!-- Row title, clicking on title reveals rows of table
                                     https://codepen.io/Idered/pen/AeBgF */ -->
-                                <input type="checkbox" class="read-more-state" :id="'_'+table_rank">
+                                <input type="checkbox" class="read-more-state" :id="'_'+table_rank" :value="table_rank" v-model="clickedTables">
                                 
-                                <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;"
-                                    v-html="'List of '
-                                            + makeKeywordsBold(table['title'], keywords) 
-                                            + ': ('
-                                            + Object.keys(results[table_rank]['rows']).length
-                                            + (Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ')
-                                            + results[table_rank]['rowCount']
-                                            + ' rows)'">
+                                <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;">
+                                    List of
+                                    <span v-html="makeKeywordsBold(table['title'], keywords)"></span>
+                                    : ({{ Object.keys(results[table_rank]['rows']).length }}
+                                    {{Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from '}}
+                                    {{results[table_rank]['rowCount']}}
+                                     rows)
+                                    <span v-if="isARowSelected(table['table_id'])">***</span>
+                                            
                                 </label>
                                     
                                 <!-- Rows of table -->
-                                <div class="read-more-wrap">
-                                    <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
-                                        <input type="checkbox" :id="table_rank+'-'+rowID" 
-                                                :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
-                                        <label :for="table_rank+'-'+rowID"
-                                            v-html="'('
-                                                    + makeKeywordsBold(rowContent, keywords)
-                                                    + ')'">
-                                        </label>
-                                    </p> 
-                                </div>
+                                <transition name="table">
+                                    <div v-if="isTableChecked(table_rank)">
+                                        <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
+                                            <input type="checkbox" :id="table_rank+'-'+rowID" 
+                                                    :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
+                                            <label :for="table_rank+'-'+rowID"
+                                                v-html="'('
+                                                        + makeKeywordsBold(rowContent, keywords)
+                                                        + ')'">
+                                            </label>
+                                        </p> 
+                                    </div>
+                                </transition>
                             </li>
                         </form>
                     </ul>
@@ -185,6 +188,7 @@ export default {
     data: function() {
         return {
             document: document,  
+            clickedTables: [],
             selectedRows: [],
             keywords: '',
             results: "",
@@ -273,6 +277,14 @@ export default {
             }
         },
 
+        isTableChecked(table_rank) {
+            return this.clickedTables.indexOf(table_rank) !== -1
+        },
+
+        isARowSelected(table_id) {
+            return this.selectedRows.some(row => row['tableID'] === table_id);
+        },
+
         makeKeywordsBold (str, keywords) {
             /* Make all keywords appear bold in result
              * TODO: 'this' refers methods (dunno why), so we pass the keywords by value 
@@ -305,7 +317,7 @@ export default {
                 numCols: numCols,
             }
         },
-    }
+    }, 
 }
 
 </script>
@@ -336,17 +348,17 @@ input[type='text'] {
   display: none;
 }
 
-.read-more-target {
-  opacity: 0;
-  max-height: 0;
-  font-size: 0;
-  transition: .25s ease;
-}
-
-.read-more-state:checked ~ .read-more-wrap .read-more-target {
+.table-enter-active, .table-leave-active {
   opacity: 1;
   font-size: inherit;
   max-height: 999em;
+  transition: .25s ease;
+}
+
+.table-enter, .table-leave-to {
+  opacity: 0;
+  max-height: 0;
+  font-size: 0;
 }
 
 .read-more-trigger {
