@@ -609,40 +609,41 @@ class Database {
         var pValDP = [];
         var cols = [];
         var bestPerm;
-        var permSet;
         var column;
         var pass;
         var stmt;
 
+        
+        
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'text')
-                continue
-
+            continue
+            
             ssCols.push([])
             sliderIndices.push(this.seedSet['sliders'][i])
             column = ssCols[ssCols.length - 1]
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
-                    column.push(rows[j][i])
+                column.push(rows[j][i])
             }
         }
-
+        
         for (let i = 0; i < sliderIndices.length; i++)
-            pValDP.push([])
-
+        pValDP.push([])
+        
         return new Promise((resolve, reject) => {
             try {
-
+                
                 /* The steps required to find the permutations of the textual columns
-                 * are quite similar to the steps for finding numerical column permutations.
-                 * However, there are a few important differences that prevent the two operations
-                 * from being combined into one function, such as the method used to score the permutations
-                 * and the format required of the columns retrieved */
-                var result;
-                for (let i = 0; i < tables.length; i++) {
-                    result = tables[i]
-                    cols = [];
-                    stmt = this.db.prepare(`
+                * are quite similar to the steps for finding numerical column permutations.
+                * However, there are a few important differences that prevent the two operations
+                * from being combined into one function, such as the method used to score the permutations
+                * and the format required of the columns retrieved */
+               var result;
+               for (let i = 0; i < tables.length; i++) {
+                   result = tables[i]
+                   cols = [];
+                   stmt = this.db.prepare(`
                         SELECT table_id, col_id, toArr(value) AS column
                         FROM cells c NATURAL JOIN columns col
                         WHERE col.type = 'text'
@@ -653,23 +654,23 @@ class Database {
                     `)
 
                     this.all(stmt, [result['table_id']], cols)
-
+                    
                     /* 'refine' result of query */
                     cols = {
                         columns: cols.map(res => JSON.parse(res['column'])),
                         colIDs: cols.map(res => res['col_id'])
                     }
-
+                    
                     /* Re-initialize dynamic programming array */
                     this.resetDPArr(pValDP, sliderIndices.length, Math.max(...cols['colIDs']))
-
+                    
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
                             pValDP[i][cols['colIDs'][j]] = this.overlapSim(ssCols[i], col)
                         })
                     }
-
+                    
                     bestPerm = {
                         table_id: result['table_id'],
                         textualPerm: [],
@@ -678,22 +679,24 @@ class Database {
                     /* If the key column in the seed set has a successful mapping,
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
-
-                    combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
-                        curCumProbs = [];
-
-                        for (let i = 0; i < ssCols.length; i++) {
-                            curCumProbs.push(pValDP[i][perm[i]])
-                        }
-
-                        pass = curCumProbs.every((val, i) => val >= sliderIndices[i] / 100)
-                        curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
-
-                        if (pass && curCumProbs > bestPerm['textScore']) {
-                            bestPerm['textualPerm'] = perm;
-                            bestPerm['textScore'] = curCumProbs
-                        }
-                    })
+                   
+                    if (this.seedSet['numTextual']) {
+                        combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
+                            curCumProbs = [];
+    
+                            for (let i = 0; i < ssCols.length; i++) {
+                                curCumProbs.push(pValDP[i][perm[i]])
+                            }
+    
+                            pass = curCumProbs.every((val, i) => val >= sliderIndices[i] / 100)
+                            curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
+    
+                            if (pass && curCumProbs > bestPerm['textScore']) {
+                                bestPerm['textualPerm'] = perm;
+                                bestPerm['textScore'] = curCumProbs
+                            }
+                        })
+                    }
 
                     if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
                         tables[i] = bestPerm
@@ -747,10 +750,8 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                /* No textual columns in seed set */
-
                 for (let i = 0; i < this.seedSet['numNumerical']; i++)
-                    pValDP.push([])
+                pValDP.push([])
                 /* Get the best permutation for numerical columns for each table */
                 for (let i = 0; i < tables.length; i++) {
                     table = tables[i]
@@ -763,62 +764,63 @@ class Database {
                         AND c.location != 'header'
                         AND table_id = ?
                         GROUP BY table_id, col_id
-                    `)
-
+                        `)
+                        
                     this.all(stmt, [table['table_id']], cols)
-
+                    
                     /* 'refine' result of query */
                     cols = {
                         columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
                         colIDs: cols.map(res => res['col_id'])
                     }
-
+                    
                     /* Re-initialize dynamic programming array */
                     this.resetDPArr(pValDP, this.seedSet['numNumerical'], Math.max(...cols['colIDs']))
-
+                    
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
                             pValDP[i][cols['colIDs'][j]] = Math.log(
                                 Math.max(this.ttestCases(ssCols[i], col), this.overlapSim(ssCols[i], col))
-                            )
-                        })
-                    }
-
-                    table['numericalPerm'] = []
+                                )
+                            })
+                        }
+                        
+                    table['numericalPerm'] = [];
                     table['chiTestStat'] = Infinity;
-
+                    
                     curChiTestStat = 0;
-
+                    
                     /* Iterate over all permutations of the columns, 
                     * finding the one that returns the highest chi^2 test statistic
                     * by using Fisher's method */
-                    combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
-                        curChiTestStat = 0;
-
-                        for (let i = 0; i < ssCols.length; i++) {
-                            curChiTestStat += pValDP[i][idPerm[i]]
-                        }
-
-                        curChiTestStat *= -2;
-
-                        if (curChiTestStat < table['chiTestStat']) {
-
-                            table['numericalPerm'] = idPerm;
-                            table['chiTestStat'] = curChiTestStat
-                        }
-                    })
-
+                    if (this.seedSet['numNumerical'] && cols['colIDs'].length < Math.max(this.seedSet['numCols'], 14)) {
+                       combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
+                           curChiTestStat = 0;
+    
+                           for (let i = 0; i < ssCols.length; i++) {
+                               curChiTestStat += pValDP[i][idPerm[i]]
+                            }
+                            
+                            curChiTestStat *= -2;
+                            
+                            if (curChiTestStat < table['chiTestStat']) {
+                                
+                                table['numericalPerm'] = idPerm;
+                                table['chiTestStat'] = curChiTestStat
+                            }
+                        })
+                    }
                     if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
-                        tables.splice(i--, 1)
-
+                        tables.splice(i--, 1)  
+                    
                     /* Set a 'base score' for the table to be used when ranking rows */
                     else if (this.seedSet['numNumerical'])
                         table['score'] = table['chiTestStat'] + table['textScore']
                     else
                         table['score'] = table['textScore']
                 }
-
+                
                 resolve(tables);
             } catch (error) {
                 reject(error);
