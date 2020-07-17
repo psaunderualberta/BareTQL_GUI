@@ -84,11 +84,10 @@ class Database {
         })
 
         this.db.function('OVERLAP_SIM', (ssCol, keyCol) => {
-            ssCol = JSON.parse(ssCol)
+            ssCol = JSON.parse(ssCol).map(v => String(v))
             keyCol = JSON.parse(keyCol)
-
-            var colSet = new Set([...keyCol]);
-            return new Set(ssCol.filter(value => colSet.has(value))).size / ssCol.length
+            
+            return this.overlapSim(ssCol, keyCol)
         })
     }
 
@@ -197,8 +196,7 @@ class Database {
          * Accessed June 9th, 2020
          * 
          * This breaks if we have more than 500 rows in the seed set, but if a user is selecting 500
-         * rows then that's their problem.
-         */
+         * rows then that's their problem. */
         for (let i = 0; i < rowIDs.length; i++) {
             customTable.push(`SELECT ${tableIDs[i].trim()} AS table_id, ${rowIDs[i].trim()} AS row_id`)
         }
@@ -207,8 +205,7 @@ class Database {
         const stmt = this.db.prepare(` 
             SELECT DISTINCT table_id, row_id, GROUP_CONCAT(value, '${this.cellSep}') AS value
             FROM cells c NATURAL JOIN ${customTable}
-            GROUP BY table_id, row_id
-            ORDER BY table_id, row_id;
+            GROUP BY table_id, row_id;
         `)
 
         return new Promise((resolve, reject) => {
@@ -257,6 +254,7 @@ class Database {
         if (changeSeed)
             this.seedSet['types'] = this.getTypes(this.seedSet['rows'])
 
+        /* We access these values often enough that they are worth storing to save time */
         this.seedSet['numNumerical'] = this.seedSet['types'].filter(type => type === 'numerical').length
         this.seedSet['numTextual'] = this.seedSet['types'].filter(type => type === 'text').length
         this.seedSet['numNULL'] = this.seedSet['types'].filter(type => type === 'NULL').length
@@ -490,6 +488,17 @@ class Database {
     }
 
     getMatchingTables() {
+        /* Detects the tables which are likely to be related to the 
+         * seed set. This is done by evaluating the similarity between
+         * the LH-most textual column in the seed set and textual 
+         * columns in a table, and similarly for numerical columns. We then 
+         * take the intersection of the tables which matched textually and numerically
+         * 
+         * Arguments:
+         * None
+         * 
+         * Returns:
+         * - Promise which resolves with tables if querying is successful, rejects otherwise. */
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var textSlider = [];
         var numSlider = [];
@@ -557,11 +566,11 @@ class Database {
                         AND c.location != 'header'
                         AND c.value != ''
                         GROUP BY table_id, col_id
-                        HAVING T_TEST(?, toArr(value)) >= 0
+                        HAVING MAX(OVERLAP_SIM(?, toArr(value)), T_TEST(?, toArr(value))) >= ?
         
                         INTERSECT
                     `
-                    params.push(...[this.seedSet['numNumerical'], numCol])
+                    params.push(...[this.seedSet['numNumerical'], numCol, numCol, numSlider / 100])
                 }
 
                 stmt += `
@@ -575,6 +584,8 @@ class Database {
                 stmt = this.db.prepare(stmt)
                 this.all(stmt, params, tables)
 
+                console.log(tables);
+
                 resolve(tables)
             } catch (error) {
                 reject(error)
@@ -583,15 +594,13 @@ class Database {
     }
 
     getTextualMatches(tables) {
-        /* Gets the texutal matches and permutes the columns for all
-         * textual seed set columns. If there is at least one numerical column in 
-         * the seed set, then we use the tables found in the 
-         * previous step (getNumericalMatches). Otherwise, we search through the database
-         * for all tables with # of textual columns >= # of textual columns in the seed set, and
-         * perform the same operations with those.
+        /* Gets the 'best' textual permutation for all 
+         * tables found by getMatchingTables(), where 'best' 
+         * is determined by the largest cumulative overlap similarity
+         * for a permutation.
          * 
          * Arguments:
-         * None
+         * - tables: The array of tables that satisfy the constraints of getMatchingTables()
          * 
          * Returns:
          * - Promise that resolves if querying is successful, rejects otherwise */
@@ -658,8 +667,7 @@ class Database {
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
-                            permSet = new Set([...col]);
-                            pValDP[i][cols['colIDs'][j]] = new Set(ssCols[i].filter(value => permSet.has(value))).size / new Set(ssCols[i]).size
+                            pValDP[i][cols['colIDs'][j]] = this.overlapSim(ssCols[i], col)
                         })
                     }
 
@@ -672,7 +680,7 @@ class Database {
                     * Iterate over all permutations of the columns, 
                     * finding the one that returns the lowest cumulative overlap similarity */
 
-                    if (pValDP[0].some(overlapSim => overlapSim >= sliderIndices[0] / 100)) {
+                    if (pValDP[0].some(overlapSimilarity => overlapSimilarity >= sliderIndices[0] / 100)) {
                         combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
                             curCumProbs = [];
 
@@ -704,17 +712,19 @@ class Database {
     }
 
     getNumericalMatches(tables) {
-        /* for every numerical column in the seed set, getNumericalMatches
-         * compares its distribution with the numerical columns in the database
-         * using Welch's t-distribution test, or the one-sample test depending on 
-         * the length of the seed set. We then sort these columns based on their p-value,
-         * and organize them according to the seed set column they are being compared
+        /* For each table in the list of tables from 'getMatchingTables',
+         * we check all permutations of the table's numerical columns in order
+         * to see which permutation is the 'best'. A permutation is scored using "Fisher's 
+         * method" of combining p-values, where the p-value for each pair of columns
+         * is the maximum of overlap similarity and the p-value of Welch's t-test. These
+         * p-values are combined using Fisher's Method in order to produce a Chi-square test statistic,
+         * and the permutation with the highest test statistic is determined to be the best.
          * 
          * Arguments:
-         * - results: The results of getNumericalMatches
+         * - tables: The list of tables from getMatchingTables()
          * 
          * Returns:
-         * - Promise which resolves if query is successful, rejects otherwise.*/
+         * - Promise which resolves if column mapping is successful, rejects otherwise.*/
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var column = [];
@@ -772,7 +782,9 @@ class Database {
                     /* Fill DP array */
                     for (let i = 0; i < ssCols.length; i++) {
                         cols['columns'].forEach((col, j) => {
-                            pValDP[i][cols['colIDs'][j]] = Math.log(this.ttestCases(ssCols[i], col))
+                            pValDP[i][cols['colIDs'][j]] = Math.log(
+                                Math.max(this.ttestCases(ssCols[i], col), this.overlapSim(ssCols[i], col))
+                            )
                         })
                     }
 
@@ -820,13 +832,13 @@ class Database {
     }
 
     getNULLMatches(tables) {
-        /* If there are any columns in the seed set which are entirely filled with
+        /* If there are 'n' columns in the seed set which are entirely filled with
          * 'NULL', this function will find the first 'n' columns in ascending order which 
-         * is not already in the numericalPerm or textualPerm for the table, and add them
-         * to the table's 'NULLperm'; where 'n' is the number of NULL columns in the seed set
+         * are not already in the numericalPerm or textualPerm for the table. It will then add them
+         * to the table's 'NULLperm'.
          * 
          * Arguments:
-         * - tables: The list of table objects after textual and numerical column mapping
+         * - tables: The list of table objects from getMatchingTables(), after textual and numerical column mapping
          * 
          * Returns:
          * - Promise which resolves if querying is successful, rejects otherwise */
@@ -943,7 +955,7 @@ class Database {
          * Returns:
          * - Promise which resolves if ranking is successful, rejects otherwise */
 
-        var rows = this.seedSet['rows'].map(row => row.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell)))
+        var rows = this.seedSet['rows'].map(row => row.split(' || '))
         var results = [];
         var score = 0;
 
@@ -952,16 +964,16 @@ class Database {
                 for (let table of tables) {
                     for (let tableRow of table['rows']) {
                         score = table['score'];
-                        tableRow = tableRow.split(' || ').map(cell => isNaN(cell) ? cell : Number(cell))
+                        tableRow = tableRow.split(' || ')
                         for (let row of rows) {
 
                             /* Emphasises NULL values, esp. for numerical columns */
                             for (let i = 0; i < row.length; i++) {
                                 if (!isNaN(row[i]) && !isNaN(tableRow[i]))
-                                    score += Math.pow(row[i] - tableRow[i], 2)
+                                    score += Math.pow(Number(row[i]) - Number(tableRow[i]), 2)
                                         * (this.seedSet['sliders'][i])
                                 else {
-                                    score += Math.pow(leven(String(row[i]), String(tableRow[i])), 2)
+                                    score += Math.pow(leven(row[i], tableRow[i]), 2)
                                         * (this.seedSet['sliders'][i])
                                 }
                             }
@@ -986,28 +998,28 @@ class Database {
     }
 
     applyUniqueConstraints(rankedRows) {
-        /* Applies the unique constraints for each column that the 
-         * user tagged as 'unique'.
+        /* Ensures that each column that the user tagged as 'unique' is, in fact, unique.
          * 
          * Arguments:
          * - rankedRows: The rows that are sorted in ascending order according to their score
          * 
-         * Returns: The top 10 results, checked to ensure unique constraints are valid */
-        var rowsInSeedSet = 0;
+         * Returns: The top 10 results (or less), checked to ensure unique constraints are valid */
         var columnSets = [];
         var uniqueRows = [];
         var rrIndex = 0;
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows.length < 10 && rrIndex < rankedRows.length) {
-
-            if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows[rrIndex][col])).every(value => value === false)) {
+            if (uniqueRows.indexOf(rankedRows[rrIndex].join(' || ')) !== -1)
+                rrIndex++;
+            /* No values in rankedRows[rrIndex] are in the uniqueCols' sets */
+            else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows[rrIndex][col])).every(inSet => inSet === false)) {
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
                     columnSets[i].add(rankedRows[rrIndex][el])
                 uniqueRows.push(rankedRows[rrIndex++].join(' || '))
-            } else {
+            /* A unique constraint is broken if we show the row to the user */
+            } else
                 rrIndex++;
-            }
         }
 
         return uniqueRows
@@ -1172,6 +1184,11 @@ class Database {
         }
 
         return qMarks
+    }
+
+    overlapSim(arr1, arr2) {
+        var colSet = new Set(arr2);
+        return new Set(arr1.filter(value => colSet.has(value))).size / new Set(arr1).size
     }
 
     resetDPArr(dpArr, ssCols, potTableCols) {

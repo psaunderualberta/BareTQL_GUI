@@ -77,6 +77,12 @@ input[type=checkbox]:checked + label {
     top: 2%;
 }
 
+.no-overflow {
+    max-height: 500px;
+    overflow-y: auto;
+    margin-bottom: 5px;
+}
+
 .deactivate {
     opacity: 0.5;
 }

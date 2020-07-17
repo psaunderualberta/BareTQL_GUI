@@ -2,17 +2,16 @@ const axios = require('axios');
 const bm25 = require('wink-bm25-text-search')
 const nlp = require('wink-nlp-utils')
 
-const kwURL = 'http://localhost:3000/api/results/keyword/?keyword='; // hardcoded for now
-const seedSetURL = 'http://localhost:3000/api/results/seed-set/?tableIDs=';
-const dotOpURL = 'http://localhost:3000/api/results/dot-op/?dotOp='
-const deleteURL = 'http://localhost:3000/api/results/delete/?del='
-const swapURL = 'http://localhost:3000/api/results/swap/?rowIDs='
+const baseURL = 'http://localhost:3000/api/results/';
+const kwURL = `${baseURL}keyword/?keyword=`;
+const seedSetURL = `${baseURL}seed-set/?tableIDs=`;
+const dotOpURL = `${baseURL}dot-op/?dotOp=`
+const deleteURL = `${baseURL}delete/?del=`
+const swapURL = `${baseURL}swap/?rowIDs=`
 
 const pipe = [
-    nlp.string.trim,
     nlp.string.lowerCase,
     nlp.string.tokenize0,
-    nlp.tokens.stem,
 ];
 
 class ResultService {
@@ -245,7 +244,7 @@ class ResultService {
             engine.consolidate()
     
             // Searching
-            let results = engine.search(keywords, 40)
+            let results = engine.search(keywords, 20)
     
             var id;
             var table;

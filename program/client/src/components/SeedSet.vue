@@ -98,7 +98,7 @@
                                     
                                 <!-- Rows of table -->
                                 <div class="read-more-wrap">
-                                <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
+                                    <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
                                         <input type="checkbox" :id="table_rank+'-'+rowID" 
                                                 :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
                                         <label :for="table_rank+'-'+rowID"
@@ -150,7 +150,9 @@
                         <div v-else>
 
                             <!-- Table content -->
-                            <UserTable :table="table['rows']" :allowSelection="false"/>
+                            <div class="no-overflow">
+                                <UserTable :table="table['rows']" :allowSelection="false"/>
+                            </div>
                             <button @click="postSeedSet">Use as Seed Set</button>
                         </div>
                     </div>
