@@ -1,11 +1,11 @@
 <template>
-    <div>
+    <div v-if="typeof table !== 'undefined'">
         <div v-if="allowSelection && selectedCells.length === 2"> <!-- 'allowSelection' is unnecessary, but keeping for clarity -->
             <button v-on:submit.prevent @click="swap">
                 Swap selected cells
             </button>
         </div>
-        <table>
+        <table :id="'user-table-'+id">
             <tbody>
                 <tr v-for="(row, row_index) in table" :key="row_index">
                     <td v-for="(cell, col_index) in row" :key="col_index">
@@ -22,7 +22,7 @@
                 </tr>
             </tbody>
         </table>
-        <button v-if="downloadable && table.length > 0">Download as CSV</button>
+        <button v-if="downloadable && table.length > 0" @click="exportTableToCSV('BareTQL.csv')">Download as CSV</button>
     </div>
 </template>
 
@@ -36,7 +36,8 @@ export default {
     },
     data: function() {
         return {
-            selectedCells: []
+            selectedCells: [],
+            id: String(Math.random()),
         }
     },
     methods: {
@@ -59,7 +60,58 @@ export default {
             /* Tells parent to swap selected cells */
             this.$emit('swap', this.formatSelectedCells())
             this.selectedCells = []; // reset selected cells
+        },
+
+        /* Downloading a CSV file based on an HTML table
+         * https://www.codexworld.com/export-html-table-data-to-csv-using-javascript/
+         * Accessed July 20th, 2020 */
+
+        downloadCSV(csv, filename) {
+            /* Downloads the csv file */
+            var csvFile;
+            var downloadLink;
+
+            // CSV file
+            csvFile = new Blob([csv], {type: "text/csv"});
+
+            // Download link
+            downloadLink = document.createElement("a");
+
+            // File name
+            downloadLink.download = filename;
+
+            // Create a link to the file
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+
+            // Hide download link
+            downloadLink.style.display = "none";
+
+            // Add the link to DOM
+            document.body.appendChild(downloadLink);
+
+            // Click download link
+            downloadLink.click();
+        },
+        
+        exportTableToCSV(filename) {
+            /* Downloads the csv file */
+            var csv = [];
+            var rows = document.querySelectorAll(`#user-table-${this.id.replace('.', '\\.')} tr`);
+            
+            for (var i = 0; i < rows.length; i++) {
+                var row = [], cols = rows[i].querySelectorAll("td, th");
+                
+                for (var j = 0; j < cols.length; j++) 
+                    row.push(cols[j].innerText);
+                
+                csv.push(row.join(","));        
+            }
+
+            // Download CSV file
+            this.downloadCSV(csv.join("\n"), filename);
         }
+
+        /* End of code from https://www.codexworld.com/export-html-table-data-to-csv-using-javascript/ */
     }
 }
 
