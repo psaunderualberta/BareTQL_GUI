@@ -22,6 +22,7 @@
                 </tr>
             </tbody>
         </table>
+        <button v-if="downloadable && table.length > 0">Download as CSV</button>
     </div>
 </template>
 
@@ -31,6 +32,7 @@ export default {
     props: {
         table: Array,
         allowSelection: Boolean,
+        downloadable: Boolean,
     },
     data: function() {
         return {

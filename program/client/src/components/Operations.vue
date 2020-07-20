@@ -100,7 +100,7 @@
             <hr style="width: 80%;">
             <h3 v-if="expandedRows !== null">Expanded Rows: {{ expandedRows.length }} rows found</h3>
             <h4 v-else>No operation selected</h4>
-            <UserTable :table="expandedRows" :allowSelecton="false" />
+            <UserTable :table="expandedRows" :allowSelecton="false" :downloadable="true"/>
         </div>
     </div>
 </template>
