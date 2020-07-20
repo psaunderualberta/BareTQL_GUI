@@ -13,7 +13,6 @@ which button is clicked -->
         {{ item.message }}
         </button>
 
-        <!-- record which is displayed -->
     </div>
 </template>
 

@@ -80,7 +80,7 @@
                     </p>
                 </template>
             </Instruction>
-            <ButtonList :arr="functions" origin="Operations" @NewClick="changeOp"/>
+            <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp"/>
             <button id="dot-op-submit" v-if="dotOp.length !== 0" @click="executeDotOp" v-on:submit.prevent >
                 Confirm Selection
             </button>
@@ -153,26 +153,28 @@ export default {
             for (let inp of Object.values(inputButtons)) {inp.disabled = false; inp.classList.toggle('deactivate')}
         },
 
-        executeDotOp() {
+        executeDotOp(op) {
             /* Executes the dot op selected by user */
-            var changeButton = function(button, content) {
-                button.textContent = content;
-                button.disabled = !button.disabled;
-                button.classList.toggle('deactivate');
+            var changeButtons = function(buttons, content) {
+                for (let key in Object.keys(buttons)) {
+                    buttons[key].textContent = content;
+                    buttons[key].disabled = !buttons[key].disabled;
+                    buttons[key].classList.toggle('deactivate');
+                }
             }
 
             // this.expandedRows = [];
 
-            var submitButton = this.document.querySelector("#dot-op-submit")
-            changeButton(submitButton, "Loading Results...")
+            var submitButton = this.document.querySelectorAll(".Operations")
+            changeButtons(submitButton, "Loading Results...")
             
-            ResultService.handleDotOps(this.dotOp, this.sliderValues, this.uniqueCols)
+            ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
             .then((data) => {
-                changeButton(submitButton, "Click to perform operation")
+                changeButtons(submitButton, "Click to perform operation")
                 this.expandedRows = this.handleResponse(data);
             })
             .catch((err) => {
-                changeButton(submitButton, "An error occurred. Please try again")
+                changeButtons(submitButton, "An error occurred. Please try again")
                 console.log(err);
             })
         },
@@ -217,10 +219,6 @@ export default {
                     this.nullCount = tmp.length * this.numCols - cellCount
             }
             return tmp
-        },
-        changeOp(newOp) {
-            /* Changes the operation, activated from ButtonList emission */
-            this.dotOp = newOp;
         },
 
         swapCells(indices) {

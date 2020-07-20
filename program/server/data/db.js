@@ -416,16 +416,8 @@ class Database {
                     /* Only upon initialization of the dot-ops page OR user deleted all columns */
                     if (dotOp === 'undefined' || this.seedSet['rows'].every(row => row.length === 0)) {
                         res(this.seedSet['rows'].flat())
-
                     } else if (dotOp === 'xr') {
-                        this.xr()
-                        .then((results) => {
-                            res(results)
-                        })
-                    } else if (dotOp === 'xc') {
-                        this.xc()
-                    } else if (dotOp === 'fill') {
-                        this.fill()
+                        this.xr().then((results) => { res(results) })
                     } else {
                         rej(`dotOp specified (${dotOp}) is not possible`)
                     }
@@ -477,14 +469,6 @@ class Database {
                 reject(error);
             }
         })
-    }
-
-    xc() {
-
-    }
-
-    fill() {
-
     }
 
     getMatchingTables() {
