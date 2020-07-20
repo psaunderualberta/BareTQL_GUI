@@ -111,10 +111,10 @@ export default {
         exportTableToCSV(filename) {
             /* Downloads the csv file */
             var csv = [];
-            var rows = document.querySelectorAll(`#user-table-${this.id.replace('.', '\\.')} tr`);
+            var rows = document.querySelectorAll(`#user-table-${this.id.replace('.', '\\.')} div.table-row`);
             
             for (var i = 0; i < rows.length; i++) {
-                var row = [], cols = rows[i].querySelectorAll("td, th");
+                var row = [], cols = rows[i].querySelectorAll("div.table-cell, div.table-header");
                 
                 for (var j = 0; j < cols.length; j++) 
                     row.push(cols[j].innerText);
@@ -166,6 +166,10 @@ td {
     vertical-align: middle;
 }
 
+/* Allows the pop-ups with more information
+ * https://www.w3schools.com/css/css_tooltip.asp 
+ * Accessed July 20th 2020 */
+
 /* Tooltip container */
 .tooltip {
   position: relative;
@@ -178,6 +182,7 @@ td {
   background-color: black;
   color: #fff;
   text-align: center;
+  font-size: 0.8em;
   padding: 5px 0;
   border-radius: 6px;
  

@@ -986,6 +986,13 @@ class Database {
                 
                 var tmp = {rows: [], info: []}
                 results.forEach(res => {
+                    /* RegExp for inserting commas into a number
+                     * http://stackoverflow.com/questions/721304/ddg#721415
+                     * Accessed July 20th 2020 */
+                    res['score'] = String(res['score']).replace(new RegExp(`(\\d)(?=(\\d{3})+$)`, 'gi'), match => {
+                        return match + ','
+                    })
+                    
                     tmp['rows'].push(res['row']);
                     tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Score: ${res['score']}`)
                 })
