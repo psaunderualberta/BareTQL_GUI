@@ -15,5 +15,5 @@ app.use('/api/results', results);
 const port = process.env.PORT || 3000;
 
 app.listen(port, 'localhost', function(req, res) {
-    console.log(`Server stared on port ${port}`);
+    console.log(`Server started on port ${port}`);
 });
