@@ -6,7 +6,7 @@
                 <template #hidden>
                     <p>
                         This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
-                        in the previous section and find different rows in the database that match the seed set, based on parameters that you choose.
+                        in the previous section and find different rows in the database that match the seed set, based on parameters that you have set.
                     </p>
                 </template>
             </Instruction>
@@ -61,7 +61,7 @@
                     </tr>
                 </tbody>
             </table>
-            <Instruction ref="instruction-5" index="5">
+            <Instruction ref="instruction-2" index="2">
 
                 <template #hidden>
                     <p>
@@ -72,7 +72,7 @@
             </Instruction>
             <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
 
-            <Instruction ref="instruction-2" index="2">
+            <Instruction ref="instruction-5" index="5">
                 <template #hidden>
                     <p>
                         These are the operations with which you can expand your seed set. <br>
@@ -88,7 +88,15 @@
         
         <!-- Result of Set Expansion -->
         <div class="separate-components centering">
-            <h2>Result of Set Expansion</h2>
+            <Instruction ref="instruction-6" index="6">
+                <template #shown>
+                    <h2>Result of Set Expansion</h2>
+                </template>
+
+                <template #hidden>
+                    <p>Here are the expanded rows of your seed set.</p>
+                </template>
+            </Instruction>
             <hr style="width: 80%;">
             <h3 v-if="expandedRows !== null">Expanded Rows: {{ expandedRows.length }} rows found</h3>
             <h4 v-else>No operation selected</h4>

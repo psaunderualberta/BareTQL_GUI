@@ -419,9 +419,9 @@ class Database {
 
                     } else if (dotOp === 'xr') {
                         this.xr()
-                            .then((results) => {
-                                res(results)
-                            })
+                        .then((results) => {
+                            res(results)
+                        })
                     } else if (dotOp === 'xc') {
                         this.xc()
                     } else if (dotOp === 'fill') {

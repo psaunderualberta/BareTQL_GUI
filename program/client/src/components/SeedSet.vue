@@ -9,7 +9,7 @@
             <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
                 <template #hidden>
                     <p>
-                        Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables. <br>
+                        Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables. 
                         There are two parts to the tool: the screen you are looking at right now is the first screen, where keyword searching occurs.
                     </p>
                 </template>
@@ -20,7 +20,7 @@
 
                 <template #hidden>
                     <p>
-                        This is where you can enter keywords to search for in the database.<br>
+                        This is where you can enter keywords to search for in the database.
                         Separate individual keywords by a comma, and then click the submit button below to run your query. Note
                         that common words like 'the' or 'and' will take longer to query, just because they are more common in the database.
                     </p>
@@ -56,8 +56,8 @@
                             
                             <template #hidden>
                                 <p>
-                                    This the the 'Results' tab, where the results of your query will be shown, separated into tables. <br>
-                                    Click on the title of a table to see its rows, and click on a row to add it to your seed set.
+                                    This the the 'Results' tab, where the results of your query will be shown, 
+                                    separated into tables. Click on the title of a table to see its rows, and click on a row to add it to your seed set.
                                 </p>
                             </template>
                         </Instruction>
@@ -136,7 +136,7 @@
                             <template #hidden>
                                 <p>
                                     This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
-                                    click the "Use as Seed Set" button to begin the "Set Expansion" section of the application.
+                                    click the "Use as Seed Set" button to begin the next section of the application.
                                 </p>
                             </template>
 
