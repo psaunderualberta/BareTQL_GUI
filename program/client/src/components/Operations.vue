@@ -98,9 +98,9 @@
                 </template>
             </Instruction>
             <hr style="width: 80%;">
-            <h3 v-if="typeof expandedRows !== 'undefined'">Expanded Rows: {{ expandedRows.length }} rows found</h3>
+            <h3 v-if="typeof expandedRows !== 'undefined'">Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
             <h4 v-else>No operation selected</h4>
-            <UserTable :table="expandedRows" :allowSelecton="false" :downloadable="true"/>
+            <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true"/>
         </div>
     </div>
 </template>
@@ -125,17 +125,15 @@ export default {
         return {
             functions: [
                 {message: 'Expand Rows (XR)', value: 'XR'},
-                // {message: 'Expand Columns (XC)', value: 'XC'},
-                // {message: 'Fill Null Values', value: 'Fill'},
             ],
             document: document,
-            expandedRows: undefined,
+            expandedRows: {rows: [], info: []},
             sliderValues: [],
             uniqueCols: [],
             deletions: [],
             nullCount: 0,
             numCols: 0,
-            table: [],
+            table: {},
             dotOp: "",
         }
     },
@@ -163,18 +161,17 @@ export default {
                 }
             }
 
-            // this.expandedRows = [];
-
-            var submitButton = this.document.querySelectorAll(".Operations")
-            changeButtons(submitButton, "Loading Results...")
+            var submitButtons = this.document.querySelectorAll(".Operations")
+            changeButtons(submitButtons, "Loading Results...")
             
             ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
             .then((data) => {
-                changeButtons(submitButton, "Click to perform operation")
+                changeButtons(submitButtons, "Click to perform operation")
                 this.expandedRows = this.handleResponse(data);
+                console.log(this.expandedRows)
             })
             .catch((err) => {
-                changeButtons(submitButton, "An error occurred. Please try again")
+                changeButtons(submitButtons, "An error occurred. Please try again")
                 console.log(err);
             })
         },
@@ -194,7 +191,7 @@ export default {
         handleResponse(data, seedSet = false) {
             /* handles the response from the API when receiving a modified seed set */
             var cellCount = 0;
-            var tmp = [];
+            var tmp = {rows: [], info: []};
             this.numCols = 0;
             this.sliderValues = []
 
@@ -203,21 +200,23 @@ export default {
                     this.sliderValues.push(Number(data['sliders'][i]));
                 }
     
-                data = data['rows']
+                if (typeof data['info'] !== 'undefined')
+                    tmp['info'] = data['info']
     
-                if (data.length > 0 && data[0].length > 0) {
-                    data.forEach(row => {
+                if (data['rows'].length > 0 && data['rows'][0].length > 0) {
+                    data['rows'].forEach(row => {
                         row = row.split(' || ')
                         cellCount += row.filter(cell => cell !== "NULL").length;
                         this.numCols = Math.max(this.numCols, row.length);
-        
-                        tmp.push(row) 
+                        tmp['rows'].push(row) 
                     });
                 }
     
                 if (seedSet) 
-                    this.nullCount = tmp.length * this.numCols - cellCount
+                    this.nullCount = tmp['rows'].length * this.numCols - cellCount
             }
+
+            console.log(tmp)
             return tmp
         },
 
@@ -261,7 +260,7 @@ export default {
 
     updated() {
         /* Adjusts number of columns when table is updated */
-        this.table.forEach(row => {
+        this.table['rows'].forEach(row => {
             this.numCols = Math.max(row.length, this.numCols)
         })
     }

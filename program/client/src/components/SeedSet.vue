@@ -89,8 +89,8 @@
                                     List of
                                     <span v-html="makeKeywordsBold(table['title'], keywords)"></span>:
                                     ({{ Object.keys(results[table_rank]['rows']).length }}
-                                    {{Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from '}}
-                                    {{results[table_rank]['rowCount']}} rows)
+                                    {{ Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from  ' : ' match from ' }}
+                                    {{ results[table_rank]['rowCount'] }} rows)
                                     <span v-if="isTableInSS(table['table_id'])">***</span>
                                             
                                 </label>
@@ -100,7 +100,7 @@
                                     <div v-if="isTableChecked(table_rank)">
                                         <p v-for="(rowContent, rowID) in table['rows']" :key="rowID" class="read-more-target">
                                             <input type="checkbox" :id="table_rank+'-'+rowID" 
-                                                    :value="logRowInfo(rowContent, rowID, table['table_id'])" v-model="selectedRows">
+                                                    :value="logRowInfo(rowContent, rowID, table['table_id'], 'List of' + table['title'])" v-model="selectedRows">
                                             <label :for="table_rank+'-'+rowID"
                                                 v-html="'('
                                                         + makeKeywordsBold(rowContent, keywords)
@@ -152,7 +152,7 @@
 
                             <!-- Table content -->
                             <div class="no-overflow">
-                                <UserTable :table="table['rows']" :allowSelection="false"/>
+                                <UserTable :table="table"/>
                             </div>
                             <button @click="postSeedSet">Use as Seed Set</button>
                         </div>
@@ -266,12 +266,13 @@ export default {
             })
         },
 
-        logRowInfo(rowContent, rowID, table_id) {
+        logRowInfo(rowContent, rowID, table_id, title) {
             /* Formats the data to be passed to 'selectedRows' */
             return {
                 rowContent: rowContent.split(/ *\|\| */),
                 rowID: rowID,
                 tableID: table_id,
+                origin: title,
             }
         },
 
@@ -303,9 +304,12 @@ export default {
         table: function() {
             /* Computes the seed-set table from this.selectedRows */
             var rows = [];
+            var hidden = [];
             var numRows = 0;
-            var numCols = 1;
+            var numCols = 0;
+
             this.selectedRows.forEach(row => {
+                hidden.push(row['hidden'])
                 row = row['rowContent']
                 numCols = Math.max(row.length, numCols);
                 numRows += 1
@@ -314,6 +318,7 @@ export default {
 
             return {
                 rows: rows,
+                hidden: hidden,
                 numRows: numRows,
                 numCols: numCols,
             }
