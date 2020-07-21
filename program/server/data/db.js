@@ -983,8 +983,8 @@ class Database {
                 }
 
                 results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
-                
-                var tmp = {rows: [], info: []}
+
+                var tmp = { rows: [], info: [] }
                 results.forEach(res => {
                     /* RegExp for inserting commas into a number
                      * http://stackoverflow.com/questions/721304/ddg#721415
@@ -992,7 +992,7 @@ class Database {
                     res['score'] = String(res['score']).replace(new RegExp(`(\\d)(?=(\\d{3})+$)`, 'gi'), match => {
                         return match + ','
                     })
-                    
+
                     tmp['rows'].push(res['row']);
                     tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Score: ${res['score']}`)
                 })
@@ -1016,7 +1016,7 @@ class Database {
          * 
          * Returns: The top 10 results (or less), checked to ensure unique constraints are valid */
         var columnSets = [];
-        var uniqueRows = {rows: [], info: []};
+        var uniqueRows = { rows: [], info: [] };
         var rrIndex = 0;
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
