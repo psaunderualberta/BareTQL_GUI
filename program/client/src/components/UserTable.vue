@@ -180,12 +180,12 @@ td {
 /* Tooltip text */
 .tooltip .tooltiptext {
   visibility: hidden;
-  width: 30%;
+  width: 20%;
   background-color: black;
   color: #fff;
   text-align: center;
   font-size: 0.8em;
-  padding: 5px 0;
+  padding: 5px;
   border-radius: 6px;
 
   /* Position the tooltip text - see examples below! */
@@ -193,7 +193,7 @@ td {
   z-index: 1;
   bottom: 0;
   left: 50%;
-  margin-left: -15%; /* Use half of the width (120/2 = 60), to center the tooltip */
+  margin-left: -10%; /* Use half of the width (120/2 = 60), to center the tooltip */
 }
 
 /* Show the tooltip text when you mouse over the tooltip container */

@@ -16,7 +16,7 @@
       <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div class="separate-components centering">
-      <h3>Seed Set: {{ table.length }} rows, {{ numCols }} columns, {{ nullCount }} null values</h3>
+      <h3>Seed Set: {{ table['rows'].length }} row{{ table['rows'].length - 1 ? 's' : '' }}, {{ numCols }} columns, {{ nullCount }} null values</h3>
 
       <div v-if="deletions.length > 0">
         <button

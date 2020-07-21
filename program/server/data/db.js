@@ -964,27 +964,17 @@ class Database {
 
                         /* For a particular row to be scored, scores[o][p] represents the 
                          * similarty score with the values at column 'o' and row 'p' of the seed set 
-                         * and column 'o' of the particular row */
-                        scores = Array.apply(null, Array(this.seedSet['numCols'])).map(() => {return []})
+                         * and column 'o' of the particular row. */
+                        scores = this.createColArr()
 
                         for (let j = 0; j < rows.length; j++) {
                             for (let k = 0; k < rows[j].length; k++) {
                                 if (!isNaN(rows[j][k]) && !isNaN(tableRow[k]))
-                                    scores[k].push(Math.pow(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k]), 2))
-                                else {
-                                    scores[k].push(Math.pow(leven(rows[j][k], tableRow[k]), 2))
-                                }
+                                    scores[k].push(Math.abs(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k])))
+                                else
+                                    scores[k].push(leven(rows[j][k], tableRow[k]))
                             }
-                            
                         }
-
-                        /* Normalize each array of scores (one for each column)
-                         * to be between 0 and 1, then multiply each score by the slider value.
-                         * This ensures that each column is equally weighted before the sliders are applied */
-                        scores = scores.map((arr, i) => arr.map(value => value * this.seedSet['sliders'][i] / (!Math.max(...arr) ? 1 : Math.max(...arr))))
-
-                        /* Sum all values in the 2-dimensional array to get the final score for the row */
-                        scores = scores.reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0)
 
                         results.push({
                             row: tableRow,
@@ -994,14 +984,43 @@ class Database {
                     }
                 }
 
-                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); // Sort in ascending order
+                var maxes = scores = this.createColArr()
 
+                results.forEach(res => {
+                    maxes.forEach((col, i) => {
+                        col.push(...res['score'][i])
+                    })
+                })
+
+                /* Get max of each column */
+                maxes = maxes.map(arr => arr.reduce((a, b) => Math.max(a, b), 0))
+                
+                /* For each row, divide each column score for that 
+                 * row by the maximum similarity score for that column
+                 * across ALL rows scored. That is, normalize each array of scores (one for each column)
+                 * to be between 0 and 1 (1 being the maximum measured score for that column), 
+                 * then multiply each score by the slider value.
+                 * This ensures that each column is equally weighted before the sliders are applied */
+                maxes.forEach((max, i) => {
+                    results.forEach(res => {
+                        res['score'][i] = res['score'][i].map(val => val * this.seedSet['sliders'][i] / (!max ? 1 : max))
+                    })
+                })
+
+                /* Sum each 2-D array to give a final numerical
+                 * score for each row */
+                results.forEach(res => {
+                    res['score'] = res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0)
+                })
+
+                /* Sort the rows in ascending order according to score */
+                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); 
                 var tmp = { rows: [], info: [] }
                 results.forEach(res => {
                     /* RegExp for inserting commas into a number
                      * http://stackoverflow.com/questions/721304/ddg#721415
                      * Accessed July 20th 2020 */
-                    res['score'] = String(res['score']).replace(new RegExp(`(?<!\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\.))`, 'gi'), match => {
+                    res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
                         return match + ','
                     })
 
@@ -1107,7 +1126,7 @@ class Database {
          * 
          * Returns:
          * - An array of dtypes */
-
+        
         var types = [];
         var column = [];
         var rows = table.map(row => row.split(' || '))
@@ -1116,22 +1135,22 @@ class Database {
             column = [];
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
-                    column.push(rows[j][i])
+                column.push(rows[j][i])
             }
 
             column = column.map(value => isNaN(value));
-
+            
             if (column.indexOf(true) === -1 && column.length > 0)
-                types.push("numerical")
+            types.push("numerical")
             else if (column.length === 0)
-                types.push("NULL")
+            types.push("NULL")
             else
                 types.push("text");
-        }
+            }
 
-        return types
+            return types
     }
-
+    
     ttestCases(arr1, arr2) {
         /* Handles the different cases of the t-test, 
          * returning the p-value in each case 
@@ -1144,18 +1163,18 @@ class Database {
 
         var p;
         if (arr1.length === 0 || arr2.length === 0)
-            return 0 // Lowest p-value possible => worst result (want the best match)
+        return 0 // Lowest p-value possible => worst result (want the best match)
 
         if (arr1.length === 1 && arr2.length === 1)
             p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
-
-        else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
+            
+            else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
             p = 0.98 * (Number(arr1[0] === arr2[0])) + 0.01 // Map between 0.01 and 0.99 to avoid log(0)
 
-        /* If only one row in seedSet's numerical col, use one-sample t-test */
+            /* If only one row in seedSet's numerical col, use one-sample t-test */
         else if (arr1.length === 1)
             p = Number(ttest(arr2, { mu: arr1[0] }).pValue())
-        else
+            else
             p = Number(ttest(arr1, arr2).pValue())
 
         return p
@@ -1163,7 +1182,7 @@ class Database {
 
     makeStrArr(str) {
         /* Since the SQL arguments need to be an array, 
-         * if the argument passed to a method is a string (i.e. only one keyword)
+        * if the argument passed to a method is a string (i.e. only one keyword)
          * then we must convert it to an array of one string in order for the 
          * SQL engine to accept it. 
          * 
@@ -1180,12 +1199,16 @@ class Database {
         return str
     }
 
+    createColArr() {
+        return Array.apply(null, Array(this.seedSet['numCols'])).map(() => {return []})
+    }
+    
     getQMarks(arr) {
         /* Since the SQL engine uses '?' placeholders in order to format the query,
-         * this function determines the number of question marks based on the number
-         * of arguments passed to the query (arr).
-         * 
-         * Arguments:
+        * this function determines the number of question marks based on the number
+        * of arguments passed to the query (arr).
+        * 
+        * Arguments:
          * - arr: The array which will be passed to the query engine
          * 
          * Returns:
@@ -1248,6 +1271,7 @@ class Database {
         arr[i] = arr[j];
         arr[j] = tmp;
     }
+
 
     close() {
         /* Closes the database instance. */
