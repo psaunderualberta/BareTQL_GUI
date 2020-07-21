@@ -532,7 +532,7 @@ class Database {
                             WHERE type = 'text'
                             AND col_id = 0
                             GROUP BY table_id, col_id
-                            HAVING OVERLAP_SIM(?, toArr(value)) > ?
+                            HAVING OVERLAP_SIM(?, toArr(value)) >= ?
                         )
                         WHERE type = 'text'
                         GROUP BY table_id
@@ -950,8 +950,9 @@ class Database {
 
         var rows = this.seedSet['rows'].map(row => row.split(' || '))
         var results = [];
-        var tableRow;
         var score = 0;
+        var tableRow;
+        var scores;
 
         return new Promise((resolve, reject) => {
             try {
@@ -960,24 +961,35 @@ class Database {
                     for (let i = 0; i < table['rows'].length; i++) {
                         tableRow = table['rows'][i];
                         tableRow = tableRow.split(' || ')
-                        for (let row of rows) {
 
-                            /* Emphasises NULL values, esp. for numerical columns */
-                            for (let i = 0; i < row.length; i++) {
-                                if (!isNaN(row[i]) && !isNaN(tableRow[i]))
-                                    score += Math.pow(Number(row[i]) - Number(tableRow[i]), 2)
-                                        * (this.seedSet['sliders'][i])
+                        /* For a particular row to be scored, scores[o][p] represents the 
+                         * similarty score with the values at column 'o' and row 'p' of the seed set 
+                         * and column 'o' of the particular row */
+                        scores = Array.apply(null, Array(this.seedSet['numCols'])).map(() => {return []})
+
+                        for (let j = 0; j < rows.length; j++) {
+                            for (let k = 0; k < rows[j].length; k++) {
+                                if (!isNaN(rows[j][k]) && !isNaN(tableRow[k]))
+                                    scores[k].push(Math.pow(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k]), 2))
                                 else {
-                                    score += Math.pow(leven(row[i], tableRow[i]), 2)
-                                        * (this.seedSet['sliders'][i])
+                                    scores[k].push(Math.pow(leven(rows[j][k], tableRow[k]), 2))
                                 }
                             }
+                            
                         }
+
+                        /* Normalize each array of scores (one for each column)
+                         * to be between 0 and 1, then multiply each score by the slider value.
+                         * This ensures that each column is equally weighted before the sliders are applied */
+                        scores = scores.map((arr, i) => arr.map(value => value * this.seedSet['sliders'][i] / (!Math.max(...arr) ? 1 : Math.max(...arr))))
+
+                        /* Sum all values in the 2-dimensional array to get the final score for the row */
+                        scores = scores.reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0)
 
                         results.push({
                             row: tableRow,
                             title: table['titles'][i],
-                            score: score,
+                            score: scores,
                         })
                     }
                 }
@@ -989,7 +1001,7 @@ class Database {
                     /* RegExp for inserting commas into a number
                      * http://stackoverflow.com/questions/721304/ddg#721415
                      * Accessed July 20th 2020 */
-                    res['score'] = String(res['score']).replace(new RegExp(`(\\d)(?=(\\d{3})+$)`, 'gi'), match => {
+                    res['score'] = String(res['score']).replace(new RegExp(`(?<!\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\.))`, 'gi'), match => {
                         return match + ','
                     })
 
