@@ -13,7 +13,6 @@ which button is clicked -->
         {{ item.message }}
         </button>
 
-        <!-- record which is displayed -->
     </div>
 </template>
 
@@ -29,13 +28,17 @@ export default {
             var buttons = document.querySelectorAll(`.${this.origin}`);
             var selected;
 
-            buttons.forEach(button => {
-                button.classList.remove('clicked');
-            });
-
-            if (event) {
-                event.target.classList.toggle('clicked');
-                selected = event.target;
+            if (buttons.length > 1) {
+                buttons.forEach(button => {
+                    button.classList.remove('clicked');
+                });
+    
+                if (event) {
+                    event.target.classList.toggle('clicked');
+                    selected = event.target;
+                }
+            } else {
+                selected = event.target
             }
 
             this.$emit('NewClick', selected.name.toLowerCase());

@@ -15,7 +15,7 @@ const pipe = [
 ];
 
 class ResultService {
-    
+
     static getKeywords(keywords) {
         /* Handles the API call from the user interface to the database, 
          * parses the data which is returned from the call to make it easier 
@@ -35,12 +35,12 @@ class ResultService {
                 })
 
                 axios.get(url)
-                .then((response) => {
-                    var tables = ResultService.handleResponse(response)
-                    tables = ResultService.rankTables(tables, keywords.replace(/ *, */g, ' '));
+                    .then((response) => {
+                        var tables = ResultService.handleResponse(response)
+                        tables = ResultService.rankTables(tables, keywords.replace(/ *, */g, ' '));
 
-                    resolve(tables);
-                })
+                        resolve(tables);
+                    })
             } catch (err) {
                 reject(err);
             }
@@ -69,9 +69,9 @@ class ResultService {
                             &rowIDs=${rowIDs.join('&rowIDs=')}`
                 // console.log(url);
                 axios.get(url)
-                .then(() => {
-                    resolve();
-                })
+                    .then(() => {
+                        resolve();
+                    })
             } catch (error) {
                 reject(error);
             }
@@ -91,9 +91,9 @@ class ResultService {
             try {
                 var url = `${swapURL}${indices.map(index => index[0]).join('&rowIDs=')}&colIDs=${indices.map(index => index[1]).join('&colIDs=')}`
                 axios.get(url)
-                .then((response) => {
-                    resolve(response['data']);
-                })
+                    .then((response) => {
+                        resolve(response['data']);
+                    })
             } catch (err) {
                 reject(err)
             }
@@ -114,9 +114,9 @@ class ResultService {
             try {
                 var url = `${deleteURL}${cols.join('&del=')}`
                 axios.get(url)
-                .then((response) => {
-                    resolve(response['data'])
-                })
+                    .then((response) => {
+                        resolve(response['data'])
+                    })
             } catch (error) {
                 reject(error);
             }
@@ -138,9 +138,9 @@ class ResultService {
             try {
                 var url = `${dotOpURL}${dotOp}&sliders=${sliderValues.join('&sliders=')}&unique=${uniqueCols.join('&unique=')}`
                 axios.get(url)
-                .then((response) => {
-                    resolve(response['data']);
-                })
+                    .then((response) => {
+                        resolve(response['data']);
+                    })
             } catch (err) {
                 reject(err);
             }
@@ -165,13 +165,13 @@ class ResultService {
         // https://stackoverflow.com/questions/21776389/javascript-object-grouping
 
         /* groupBy titles */
-        var tables = { };
-        data.forEach(function(item) {
+        var tables = {};
+        data.forEach(function (item) {
             var list = tables[item["table_id"]];
 
-            if(list){
+            if (list) {
                 list['rows'].push(item);
-            } else{
+            } else {
                 tables[item["table_id"]] = {
                     title: item['title'],
                     rows: [item],
@@ -181,14 +181,14 @@ class ResultService {
             delete item["table_id"]
         });
 
-        
+
         /* 'groupBy rows for each title */
         for (var id in tables) {
-            var rows = { };
-            tables[id]['rows'].forEach(function(value) {
+            var rows = {};
+            tables[id]['rows'].forEach(function (value) {
                 rows[value['row_id']] = `${value['value']}`
             });
-            
+
             tables[id]['rows'] = rows
         }
 
@@ -215,10 +215,10 @@ class ResultService {
         /* Standard pipe and config from Wink-bm25 documentation
          * https://www.npmjs.com/package/wink-bm25-text-search
          * Accessed June 19th, 2020 */
-        
+
         var rankedTables = [];
         var engine = bm25();
-        
+
         /* Wink-BM25() requires at least 3 documents.
          * If there are < 3 documents (tables), just display them 
          * as is */
@@ -232,23 +232,23 @@ class ResultService {
         } else {
 
             // Preparatory tasks
-            engine.defineConfig( { 
-                fldWeights: {title: 10, rows: 1},
-                bm25Params: {k1: 1.2, b: 0.4, k: 1}
+            engine.defineConfig({
+                fldWeights: { title: 10, rows: 1 },
+                bm25Params: { k1: 1.2, b: 0.4, k: 1 }
             });
-    
+
             engine.definePrepTasks(pipe);
             ResultService.addTablesToEngine(tables, engine)
-    
+
             // Indexing
             engine.consolidate()
-    
+
             // Searching
             let results = engine.search(keywords, 20)
-    
+
             var id;
             var table;
-    
+
             results.forEach(result => {
                 id = result[0]
                 table = tables[id]
@@ -274,14 +274,14 @@ class ResultService {
          * - Array of objects, with each object representing a table
          *      as formatted above
          */
-        
-         // TODO: Somehow include a bias for the location of the keywords
-         var curTable = { };
-         Object.keys(tables).forEach(table_id => {
+
+        // TODO: Somehow include a bias for the location of the keywords
+        var curTable = {};
+        Object.keys(tables).forEach(table_id => {
             curTable['title'] = tables[table_id]['title']           /* Join rows, split cells on separator, join cells with space */
             curTable['rows'] = Object.values(tables[table_id]['rows']).join(' ').split(' || ').join(' ')
             engine.addDoc(curTable, table_id)
-         })
+        })
     }
 }
 
