@@ -1200,6 +1200,17 @@ class Database {
     }
 
     createColArr() {
+        /* creates the array for storing the similarity
+         * scores when ranking the rows to be returned to the user.
+         * Each sub-array represents one column of the seed set, and 
+         * contains the similarity scores of that column with the 
+         * value that is being compared 
+         * 
+         * Arguments:
+         * None
+         * 
+         * Returns:
+         * - 2D array with # of sub-arrays equal to # of columns in seed set */
         return Array.apply(null, Array(this.seedSet['numCols'])).map(() => {return []})
     }
     
