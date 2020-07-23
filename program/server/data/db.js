@@ -501,9 +501,9 @@ class Database {
         var params = [];
         var stmt = "";
 
-        var getFirstCol = function (seedSet, type, slider, arr) {
+        var getFirstCol = function (seedSet, type, slider, arr, ) {
             for (let i = 0; i < seedSet['types'].length; i++) {
-                if (seedSet['types'][i] !== type)
+                if (seedSet['types'][i] !== type || seedSet['sliders'][i] === 0)
                     continue
 
                 slider.push(seedSet['sliders'][i])
@@ -523,14 +523,13 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                if (this.seedSet['numTextual']) {
+                if (textCol.length) {
                     stmt += `
                         SELECT table_id, title
                         FROM columns NATURAL JOIN titles NATURAL JOIN (
                             SELECT table_id
                             FROM cells NATURAL JOIN columns
                             WHERE type = 'text'
-                            AND col_id = 0
                             GROUP BY table_id, col_id
                             HAVING OVERLAP_SIM(?, toArr(value)) >= ?
                         )
@@ -543,7 +542,7 @@ class Database {
                     params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
                 }
 
-                if (this.seedSet['numNumerical']) {
+                if (numCol.length) {
                     stmt += `
                         SELECT DISTINCT table_id, title
                         FROM cells c NATURAL JOIN columns col NATURAL JOIN titles   
@@ -970,9 +969,9 @@ class Database {
                         for (let j = 0; j < rows.length; j++) {
                             for (let k = 0; k < rows[j].length; k++) {
                                 if (!isNaN(rows[j][k]) && !isNaN(tableRow[k]))
-                                    scores[k].push(Math.abs(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k])))
+                                    scores[k].push(Math.pow(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k]), 2))
                                 else
-                                    scores[k].push(leven(rows[j][k], tableRow[k]))
+                                    scores[k].push(Math.pow(leven(rows[j][k], tableRow[k]), 2))
                             }
                         }
 
@@ -984,7 +983,7 @@ class Database {
                     }
                 }
 
-                var maxes = scores = this.createColArr()
+                var maxes = this.createColArr()
 
                 results.forEach(res => {
                     maxes.forEach((col, i) => {
@@ -1003,14 +1002,14 @@ class Database {
                  * This ensures that each column is equally weighted before the sliders are applied */
                 maxes.forEach((max, i) => {
                     results.forEach(res => {
-                        res['score'][i] = res['score'][i].map(val => val * this.seedSet['sliders'][i] / (!max ? 1 : max))
+                        res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)) + 1)
                     })
                 })
 
                 /* Sum each 2-D array to give a final numerical
                  * score for each row */
                 results.forEach(res => {
-                    res['score'] = res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0)
+                    res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0))
                 })
 
                 /* Sort the rows in ascending order according to score */
@@ -1025,7 +1024,7 @@ class Database {
                     })
 
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Score: ${res['score']}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Total Distance: ${res['score']}`)
                 })
 
                 results = tmp;

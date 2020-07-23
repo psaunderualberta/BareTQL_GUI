@@ -113,7 +113,7 @@
       </Instruction>
       <hr style="width: 80%;" />
       <h3
-        v-if="typeof expandedRows !== 'undefined'"
+        v-if="!bootUp "
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
       <h4 v-else>No operation selected</h4>
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" />
@@ -140,14 +140,15 @@ export default {
   data: function() {
     return {
       functions: [{ message: "Expand Rows (XR)", value: "XR" }],
-      document: document,
       expandedRows: { rows: [], info: [] },
+      document: document,
+      table: {rows: []},
       sliderValues: [],
       uniqueCols: [],
       deletions: [],
+      bootUp: true,
       nullCount: 0,
       numCols: 0,
-      table: {},
       dotOp: ""
     };
   },
@@ -193,8 +194,8 @@ export default {
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
         .then(data => {
           changeButtons(submitButtons, "Click to perform operation");
+          this.bootUp = false;
           this.expandedRows = this.handleResponse(data);
-          console.log(this.expandedRows);
         })
         .catch(err => {
           changeButtons(submitButtons, "An error occurred. Please try again");
@@ -241,7 +242,6 @@ export default {
           this.nullCount = tmp["rows"].length * this.numCols - cellCount;
       }
 
-      console.log(tmp);
       return tmp;
     },
 

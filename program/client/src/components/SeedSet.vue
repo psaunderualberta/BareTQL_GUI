@@ -159,7 +159,7 @@
           </div>
         </div>
 
-        <!-- Fills up rest of 'page', so the seed set has 
+        <!-- Div fills up rest of 'page', so the seed set has 
         something over which to slide.-->
         <div></div>
       </div>

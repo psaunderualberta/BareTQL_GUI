@@ -22,9 +22,9 @@
       </div>
     </div>
     <button
-      v-if="downloadable && table.length > 0"
+      v-if="downloadable && table['rows'].length > 0"
       @click="exportTableToCSV('BareTQL.csv')"
-    >Download as CSV</button>
+    >Download as .csv</button>
   </div>
 </template>
 
@@ -34,38 +34,41 @@ export default {
   props: {
     table: {
       type: Object,
-      required: true
+      required: true,
     },
     allowSelection: {
       type: Boolean,
       required: false,
-      default: false
+      default: false,
     },
     downloadable: {
       type: Boolean,
       required: false,
-      default: false
+      default: false,
     },
     hoverEffect: {
       type: Boolean,
       required: false,
-      default: false
-    }
+      default: false,
+    },
   },
-  data: function() {
+
+  data: function () {
     return {
       selectedCells: [],
-      id: String(Math.random())
+      id: String(Math.random()),
     };
   },
+
   methods: {
     formatSelectedCells() {
       /* Formats the selected cells into an array of arrays of numbers */
       var formatted = [];
       for (let i = 0; i < this.selectedCells.length; i++)
-        formatted.push(this.selectedCells[i].split("-").map(i => Number(i)));
+        formatted.push(this.selectedCells[i].split("-").map((i) => Number(i)));
       return formatted;
     },
+
     getSelectedContent() {
       /* Gets the cell content from table based on
        * the return value of formatSelectedCells */
@@ -74,6 +77,7 @@ export default {
         content.push(this.table[indices[0]][indices[1]]);
       return content;
     },
+
     swap() {
       /* Tells parent to swap selected cells */
       this.$emit("swap", this.formatSelectedCells());
@@ -129,10 +133,10 @@ export default {
 
       // Download CSV file
       this.downloadCSV(csv.join("\n"), filename);
-    }
+    },
 
     /* End of code from https://www.codexworld.com/export-html-table-data-to-csv-using-javascript/ */
-  }
+  },
 };
 </script>
 
@@ -152,10 +156,10 @@ td {
 
 .table {
   display: table;
-  margin: 0 auto;
   table-layout: fixed;
+  margin: 0 auto;
   width: 95%;
-  padding-bottom: 3px;
+  padding-bottom: 5px;
 }
 .table-row {
   display: table-row;
