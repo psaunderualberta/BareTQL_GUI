@@ -523,6 +523,8 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
+                /* 'textCol' is a stringified array, so an empty textCol is the string '[]'.
+                 * The '- 2' is to compensate for the brackets that are always present */
                 if (textCol.length - 2) {
                     stmt += `
                         SELECT table_id, title
@@ -805,6 +807,12 @@ class Database {
                     }
                     if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
                         tables.splice(i--, 1)
+
+                    /* Set a 'base score' for the table to be used when ranking rows */
+                    else if (this.seedSet['numNumerical'])
+                        table['score'] = table['chiTestStat'] + table['textScore']
+                    else
+                        table['score'] = table['textScore']
                 }
 
                 resolve(tables);
@@ -961,9 +969,9 @@ class Database {
                         for (let j = 0; j < rows.length; j++) {
                             for (let k = 0; k < rows[j].length; k++) {
                                 if (!isNaN(rows[j][k]) && !isNaN(tableRow[k]))
-                                    scores[k].push(Math.pow(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k]), 2))
+                                    scores[k].push(Math.abs(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k])))
                                 else
-                                    scores[k].push(Math.pow(leven(rows[j][k], tableRow[k]), 2))
+                                    scores[k].push(leven(rows[j][k], tableRow[k]))
                             }
                         }
 
@@ -994,7 +1002,7 @@ class Database {
                  * This ensures that each column is equally weighted before the sliders are applied */
                 maxes.forEach((max, i) => {
                     results.forEach(res => {
-                        res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)) + 1)
+                        res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)))
                     })
                 })
 
@@ -1003,6 +1011,7 @@ class Database {
                 results.forEach(res => {
                     res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0))
                 })
+
 
                 /* Sort the rows in ascending order according to score */
                 results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); 
@@ -1037,14 +1046,15 @@ class Database {
          * Arguments:
          * - rankedRows: The rows that are sorted in ascending order according to their score
          * 
-         * Returns: The top 10 results (or less), checked to ensure unique constraints are valid */
+         * Returns: 
+         * - The top 10 results (or less) that satisfy the user's unique */
         var columnSets = [];
         var uniqueRows = { rows: [], info: [] };
         var rrIndex = 0;
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows['rows'].length < 10 && rrIndex < rankedRows['rows'].length) {
-            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ')) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
+            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
                 rrIndex++;
             /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {
