@@ -501,9 +501,9 @@ class Database {
         var params = [];
         var stmt = "";
 
-        var getFirstCol = function (seedSet, type, slider, arr) {
+        var getFirstCol = function (seedSet, type, slider, arr, ) {
             for (let i = 0; i < seedSet['types'].length; i++) {
-                if (seedSet['types'][i] !== type)
+                if (seedSet['types'][i] !== type || seedSet['sliders'][i] === 0)
                     continue
 
                 slider.push(seedSet['sliders'][i])
@@ -523,14 +523,15 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                if (this.seedSet['numTextual']) {
+                /* 'textCol' is a stringified array, so an empty textCol is the string '[]'.
+                 * The '- 2' is to compensate for the brackets that are always present */
+                if (textCol.length - 2) {
                     stmt += `
                         SELECT table_id, title
                         FROM columns NATURAL JOIN titles NATURAL JOIN (
                             SELECT table_id
                             FROM cells NATURAL JOIN columns
                             WHERE type = 'text'
-                            AND col_id = 0
                             GROUP BY table_id, col_id
                             HAVING OVERLAP_SIM(?, toArr(value)) >= ?
                         )
@@ -543,7 +544,7 @@ class Database {
                     params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
                 }
 
-                if (this.seedSet['numNumerical']) {
+                if (numCol.length - 2) {
                     stmt += `
                         SELECT DISTINCT table_id, title
                         FROM cells c NATURAL JOIN columns col NATURAL JOIN titles   
@@ -950,14 +951,12 @@ class Database {
 
         var rows = this.seedSet['rows'].map(row => row.split(' || '))
         var results = [];
-        var score = 0;
         var tableRow;
         var scores;
 
         return new Promise((resolve, reject) => {
             try {
                 for (let table of tables) {
-                    score = table['score'];
                     for (let i = 0; i < table['rows'].length; i++) {
                         tableRow = table['rows'][i];
                         tableRow = tableRow.split(' || ')
@@ -984,7 +983,7 @@ class Database {
                     }
                 }
 
-                var maxes = scores = this.createColArr()
+                var maxes = this.createColArr()
 
                 results.forEach(res => {
                     maxes.forEach((col, i) => {
@@ -992,7 +991,7 @@ class Database {
                     })
                 })
 
-                /* Get max of each column */
+                /* Get max of each column, across all rows measured */
                 maxes = maxes.map(arr => arr.reduce((a, b) => Math.max(a, b), 0))
                 
                 /* For each row, divide each column score for that 
@@ -1003,29 +1002,31 @@ class Database {
                  * This ensures that each column is equally weighted before the sliders are applied */
                 maxes.forEach((max, i) => {
                     results.forEach(res => {
-                        res['score'][i] = res['score'][i].map(val => val * this.seedSet['sliders'][i] / (!max ? 1 : max))
+                        res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)))
                     })
                 })
 
                 /* Sum each 2-D array to give a final numerical
                  * score for each row */
                 results.forEach(res => {
-                    res['score'] = res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0)
+                    res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0))
                 })
+
 
                 /* Sort the rows in ascending order according to score */
                 results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); 
                 var tmp = { rows: [], info: [] }
+
+                /* RegExp for inserting commas into a number
+                 * http://stackoverflow.com/questions/721304/ddg#721415
+                 * Accessed July 20th 2020 */
                 results.forEach(res => {
-                    /* RegExp for inserting commas into a number
-                     * http://stackoverflow.com/questions/721304/ddg#721415
-                     * Accessed July 20th 2020 */
                     res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
                         return match + ','
                     })
 
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Score: ${res['score']}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Total Distance: ${res['score']}`)
                 })
 
                 results = tmp;
@@ -1045,14 +1046,15 @@ class Database {
          * Arguments:
          * - rankedRows: The rows that are sorted in ascending order according to their score
          * 
-         * Returns: The top 10 results (or less), checked to ensure unique constraints are valid */
+         * Returns: 
+         * - The top 10 results (or less) that satisfy the user's unique */
         var columnSets = [];
         var uniqueRows = { rows: [], info: [] };
         var rrIndex = 0;
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows['rows'].length < 10 && rrIndex < rankedRows['rows'].length) {
-            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ')) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
+            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
                 rrIndex++;
             /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {
@@ -1282,7 +1284,6 @@ class Database {
         arr[i] = arr[j];
         arr[j] = tmp;
     }
-
 
     close() {
         /* Closes the database instance. */

@@ -1,8 +1,12 @@
 <template>
-    <div id='logo'>
-        <h1>BareTQL</h1>
-        <a href="https://github.com/psaunderualberta/BareTQL_GUI">Link to project page</a>
-    </div>
+    <header id='logo'>
+        <div>
+            <h1>BareTQL</h1>
+        </div>
+        <div id="project-page">
+            <a href="https://github.com/psaunderualberta/BareTQL_GUI">Link to project page</a>
+        </div>
+    </header>
 </template>
 
 
@@ -21,5 +25,9 @@ a {
 #logo {
     margin-bottom: 1%;
     padding-bottom: 0.5%;
+}
+
+#project-page {
+    font-size: 0.8em;
 }
 </style>

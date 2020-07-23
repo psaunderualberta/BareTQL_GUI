@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="separate-components centering">
+    <div class="centering">
       <Logo />
       <Instruction ref="instruction-1" index="1">
         <template #hidden>
@@ -44,7 +44,7 @@
           </p>
         </template>
       </Instruction>
-      <table>
+      <div class="table">
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
@@ -72,7 +72,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </div>
       <Instruction ref="instruction-2" index="2">
         <template #hidden>
           <p>
@@ -81,7 +81,7 @@
           </p>
         </template>
       </Instruction>
-      <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
+      <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
 
       <Instruction ref="instruction-5" index="5">
         <template #hidden>
@@ -113,10 +113,10 @@
       </Instruction>
       <hr style="width: 80%;" />
       <h3
-        v-if="typeof expandedRows !== 'undefined'"
+        v-if="!bootUp "
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
       <h4 v-else>No operation selected</h4>
-      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" />
+      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
 </template>
@@ -140,14 +140,15 @@ export default {
   data: function() {
     return {
       functions: [{ message: "Expand Rows (XR)", value: "XR" }],
-      document: document,
       expandedRows: { rows: [], info: [] },
+      document: document,
+      table: {rows: []},
       sliderValues: [],
       uniqueCols: [],
       deletions: [],
+      bootUp: true,
       nullCount: 0,
       numCols: 0,
-      table: {},
       dotOp: ""
     };
   },
@@ -193,8 +194,8 @@ export default {
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
         .then(data => {
           changeButtons(submitButtons, "Click to perform operation");
+          this.bootUp = false;
           this.expandedRows = this.handleResponse(data);
-          console.log(this.expandedRows);
         })
         .catch(err => {
           changeButtons(submitButtons, "An error occurred. Please try again");
@@ -241,7 +242,6 @@ export default {
           this.nullCount = tmp["rows"].length * this.numCols - cellCount;
       }
 
-      console.log(tmp);
       return tmp;
     },
 
@@ -323,13 +323,11 @@ export default {
   width: 10%; /* Set a specific slider handle width */
   height: 100%; /* Slider handle height */
   background: #4caf50; /* Green background */
-  cursor: pointer; /* Cursor on hover */
 }
 
 .slider::-moz-range-thumb {
   width: 10%; /* Set a specific slider handle width */
   height: 100%; /* Slider handle height */
   background: #4caf50; /* Green background */
-  cursor: pointer; /* Cursor on hover */
 }
 </style>
