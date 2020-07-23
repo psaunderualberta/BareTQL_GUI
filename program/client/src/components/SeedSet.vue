@@ -1,9 +1,10 @@
 <template>
   <div id="seed-set">
-    <div class="separate-components centering" style="margin-bottom: 1%; ">
+    <div class="centering" style="margin-bottom: 1%; ">
       <Logo />
     </div>
-    <div class="separate-components centering">
+    <hr>
+    <div class="centering">
       <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
         <template #hidden>
           <p>
@@ -82,7 +83,7 @@
                   v-model="clickedTables"
                 />
 
-                <label class="read-more-trigger" :for="'_'+table_rank" style="cursor: pointer;">
+                <label class="read-more-trigger" :for="'_'+table_rank">
                   List of
                   <span v-html="makeKeywordsBold(table['title'], keywords)"></span>
                   :
@@ -340,9 +341,6 @@ export default {
 
 
 <style scoped>
-input {
-  cursor: pointer;
-}
 
 input[type="text"] {
   border: 5px solid white;
@@ -382,7 +380,6 @@ input[type="text"] {
   cursor: pointer;
   display: inline-block;
   padding: 0 0.5em;
-  color: #80c080;
   font-size: 0.95em;
   line-height: 2;
   border: 1px solid #ddd;

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="separate-components centering">
+    <div class="centering">
       <Logo />
       <Instruction ref="instruction-1" index="1">
         <template #hidden>
@@ -44,7 +44,7 @@
           </p>
         </template>
       </Instruction>
-      <table>
+      <div class="table">
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
@@ -72,7 +72,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </div>
       <Instruction ref="instruction-2" index="2">
         <template #hidden>
           <p>
@@ -323,13 +323,11 @@ export default {
   width: 10%; /* Set a specific slider handle width */
   height: 100%; /* Slider handle height */
   background: #4caf50; /* Green background */
-  cursor: pointer; /* Cursor on hover */
 }
 
 .slider::-moz-range-thumb {
   width: 10%; /* Set a specific slider handle width */
   height: 100%; /* Slider handle height */
   background: #4caf50; /* Green background */
-  cursor: pointer; /* Cursor on hover */
 }
 </style>

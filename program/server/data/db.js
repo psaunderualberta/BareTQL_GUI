@@ -1285,7 +1285,6 @@ class Database {
         arr[j] = tmp;
     }
 
-
     close() {
         /* Closes the database instance. */
         this.db.close();

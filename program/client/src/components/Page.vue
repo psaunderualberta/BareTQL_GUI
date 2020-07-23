@@ -37,15 +37,35 @@ export default {
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=PT+Serif&display=swap');
 
 body {
-    background: #1f1e1e;
-    color: #80C080;
-    font-family: "Roboto";
+    background: #051622;
+    color: #1ba098;
+    font-family: "PT Serif";
+}
+
+hr, label, input[type='submit'], button {
+    color:#deb992;
+}
+
+label, input, button {
+    cursor: pointer;
+}
+
+hr, label {
+    width: 90%;
+    height: 10%;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, #051622, #deb992, #051622);
 }
 
 p {
+    color: #1ba098;
     margin: 0 0 1em 0
 }
 
@@ -59,7 +79,6 @@ input[type='submit'], button {
     height: 30px;
     border-radius: 2px;
     background: none;
-    color:#80C080;
     margin-bottom: 0.5%;
 }
 
@@ -70,6 +89,10 @@ input[type=checkbox] {
 
 input[type=checkbox]:checked + label {
     opacity: 0.5;
+}
+
+.table {
+    color:#c9b070;
 }
 
 .sticky {
@@ -89,7 +112,6 @@ input[type=checkbox]:checked + label {
 
 .page, .separate-components {
     padding: 1% 0;
-    margin-bottom: 0.5%;
 }
 
 /* Divide the webpage into two 'halves',
@@ -101,11 +123,12 @@ like an open book */
 }
 
 .centering {
-  text-align: center;
+    text-align: center;
 }
 
 .separate-components {
   /* border: 2px solid black; */
+    margin: 0 5%;
     border-radius: 5px;
     background: #2c2b2b;
 }
