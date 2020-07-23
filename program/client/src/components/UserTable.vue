@@ -4,7 +4,7 @@
       <!-- 'allowSelection' is unnecessary, but keeping for clarity -->
       <button v-on:submit.prevent @click="swap">Swap selected cells</button>
     </div>
-    <div class="table" :id="'user-table-'+id">
+    <div class="table" :id="'user-table-'+id" :style="'table-layout: '+tableLayout+';'">
       <div class="table-row tooltip" v-for="(row, row_index) in table['rows']" :key="row_index">
         <div class="table-cell" v-for="(cell, col_index) in row" :key="col_index">
           <div v-if="allowSelection">
@@ -45,6 +45,11 @@ export default {
       type: Boolean,
       required: false,
       default: false,
+    },
+    tableLayout: {
+      type: String,
+      required: false,
+      default: 'auto'
     },
     hoverEffect: {
       type: Boolean,
@@ -156,7 +161,6 @@ td {
 
 .table {
   display: table;
-  table-layout: fixed;
   margin: 0 auto;
   width: 95%;
   padding-bottom: 5px;

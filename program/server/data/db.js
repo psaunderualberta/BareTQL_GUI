@@ -523,7 +523,7 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                if (textCol.length) {
+                if (textCol.length - 2) {
                     stmt += `
                         SELECT table_id, title
                         FROM columns NATURAL JOIN titles NATURAL JOIN (
@@ -542,7 +542,7 @@ class Database {
                     params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
                 }
 
-                if (numCol.length) {
+                if (numCol.length - 2) {
                     stmt += `
                         SELECT DISTINCT table_id, title
                         FROM cells c NATURAL JOIN columns col NATURAL JOIN titles   
@@ -805,12 +805,6 @@ class Database {
                     }
                     if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
                         tables.splice(i--, 1)
-
-                    /* Set a 'base score' for the table to be used when ranking rows */
-                    else if (this.seedSet['numNumerical'])
-                        table['score'] = table['chiTestStat'] + table['textScore']
-                    else
-                        table['score'] = table['textScore']
                 }
 
                 resolve(tables);
@@ -949,14 +943,12 @@ class Database {
 
         var rows = this.seedSet['rows'].map(row => row.split(' || '))
         var results = [];
-        var score = 0;
         var tableRow;
         var scores;
 
         return new Promise((resolve, reject) => {
             try {
                 for (let table of tables) {
-                    score = table['score'];
                     for (let i = 0; i < table['rows'].length; i++) {
                         tableRow = table['rows'][i];
                         tableRow = tableRow.split(' || ')
@@ -991,7 +983,7 @@ class Database {
                     })
                 })
 
-                /* Get max of each column */
+                /* Get max of each column, across all rows measured */
                 maxes = maxes.map(arr => arr.reduce((a, b) => Math.max(a, b), 0))
                 
                 /* For each row, divide each column score for that 
@@ -1015,10 +1007,11 @@ class Database {
                 /* Sort the rows in ascending order according to score */
                 results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); 
                 var tmp = { rows: [], info: [] }
+
+                /* RegExp for inserting commas into a number
+                 * http://stackoverflow.com/questions/721304/ddg#721415
+                 * Accessed July 20th 2020 */
                 results.forEach(res => {
-                    /* RegExp for inserting commas into a number
-                     * http://stackoverflow.com/questions/721304/ddg#721415
-                     * Accessed July 20th 2020 */
                     res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
                         return match + ','
                     })

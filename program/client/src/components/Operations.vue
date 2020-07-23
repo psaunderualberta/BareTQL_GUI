@@ -81,7 +81,7 @@
           </p>
         </template>
       </Instruction>
-      <UserTable :table="table" :allowSelection="true" @swap="swapCells" />
+      <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
 
       <Instruction ref="instruction-5" index="5">
         <template #hidden>
@@ -116,7 +116,7 @@
         v-if="!bootUp "
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
       <h4 v-else>No operation selected</h4>
-      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" />
+      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
 </template>
