@@ -16,7 +16,7 @@
       <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div class="separate-components centering">
-      <h3>Seed Set: {{ table['rows'].length }} row{{ table['rows'].length - 1 ? 's' : '' }}, {{ numCols }} columns, {{ nullCount }} null values</h3>
+      <h3>Seed Set</h3>
 
       <div v-if="deletions.length > 0">
         <button
@@ -147,7 +147,6 @@ export default {
       uniqueCols: [],
       deletions: [],
       bootUp: true,
-      nullCount: 0,
       numCols: 0,
       dotOp: ""
     };
@@ -207,7 +206,7 @@ export default {
       /* Deletes all columns that the user has selected */
       ResultService.deleteCols(this.deletions)
         .then(data => {
-          this.table = this.handleResponse(data, true);
+          this.table = this.handleResponse(data);
           this.deletions = [];
         })
         .catch(err => {
@@ -215,9 +214,8 @@ export default {
         });
     },
 
-    handleResponse(data, seedSet = false) {
+    handleResponse(data) {
       /* handles the response from the API when receiving a modified seed set */
-      var cellCount = 0;
       var tmp = { rows: [], info: [] };
       this.numCols = 0;
       this.sliderValues = [];
@@ -237,9 +235,6 @@ export default {
             tmp["rows"].push(row);
           });
         }
-
-        if (seedSet)
-          this.nullCount = tmp["rows"].length * this.numCols - cellCount;
       }
 
       return tmp;
@@ -249,7 +244,7 @@ export default {
       /* Swaps the two cells selected by the user */
       ResultService.swapCells(indices)
         .then(data => {
-          this.table = this.handleResponse(data, true);
+          this.table = this.handleResponse(data);
         })
         .catch(err => {
           console.log(err);
@@ -274,7 +269,7 @@ export default {
     /* Initial call to get the Seed Set from the API */
     ResultService.handleDotOps(undefined, this.sliderValues, this.uniqueCols)
       .then(data => {
-        this.table = this.handleResponse(data, true);
+        this.table = this.handleResponse(data);
       })
       .catch(err => {
         console.log(err);
