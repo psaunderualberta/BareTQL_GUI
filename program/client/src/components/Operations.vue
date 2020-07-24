@@ -58,7 +58,7 @@
                   <label :for="'delete'+col" style="padding-right: 1%">X</label>
                 </span>
               </div>
-              <div style="float: none;">
+              <div>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
                 <input
                   type="range"
@@ -300,15 +300,15 @@ export default {
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
 /* The slider itself */
 .slider {
-  -webkit-appearance: none; /* Override default CSS styles */
+  -webkit-appearance: none;  /* Override default CSS styles */
   appearance: none;
   width: 100%; /* Full-width */
-  height: 40%; /* Specified height */
+  height: 15px; /* Specified height */
   background: #d3d3d3; /* Grey background */
   outline: none; /* Remove outline */
   opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
-  -webkit-transition: 0.2s; /* 0.2 seconds transition on hover */
-  transition: opacity 0.2s;
+  -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+  transition: opacity .2s;
 }
 
 /* Mouse-over effects */
@@ -320,14 +320,17 @@ export default {
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none; /* Override default look */
   appearance: none;
-  width: 10%; /* Set a specific slider handle width */
-  height: 100%; /* Slider handle height */
-  background: #4caf50; /* Green background */
+  width: 15%; /* Set a specific slider handle width */
+  height: 15px; /* Slider handle height */
+  background: #deb992; /* Green background */
+  cursor: pointer; /* Cursor on hover */
 }
 
 .slider::-moz-range-thumb {
-  width: 10%; /* Set a specific slider handle width */
-  height: 100%; /* Slider handle height */
-  background: #4caf50; /* Green background */
+  width: 15%; /* Set a specific slider handle width */
+  height: 15px; /* Slider handle height */
+  border-radius: 0;
+  background: #deb992; /* Green background */
+  cursor: pointer; /* Cursor on hover */
 }
 </style>

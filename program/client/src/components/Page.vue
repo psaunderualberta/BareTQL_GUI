@@ -37,6 +37,7 @@ export default {
 </script>
 
 <style>
+/* https://designshack.net/articles/trends/best-website-color-schemes/ */
 @import url('https://fonts.googleapis.com/css2?family=PT+Serif&display=swap');
 
 body {
