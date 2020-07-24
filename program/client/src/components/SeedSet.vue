@@ -5,25 +5,7 @@
     </div>
     <hr>
     <div class="centering">
-      <Instruction ref="instruction-1" index="1" style="padding-bottom: 1%;">
-        <template #hidden>
-          <p>
-            Welcome to BareTQL! BareTQL is a tool which provides a GUI search through our database of wikipedia tables.
-            There are two parts to the tool: the screen you are looking at right now is the first screen, where keyword searching occurs.
-          </p>
-        </template>
-      </Instruction>
-      <button @click="showInstructions">Click me to learn how to use BareTQL!</button>
-
-      <Instruction ref="instruction-2" index="2" style="padding-bottom: 1%;">
-        <template #hidden>
-          <p>
-            This is where you can enter keywords to search for in the database.
-            Separate individual keywords by a comma, and then click the submit button below to run your query. Note
-            that common words like 'the' or 'and' will take longer to query, just because they are more common in the database.
-          </p>
-        </template>
-      </Instruction>
+      
       <!-- Form to submit keyword queries -->
       <form v-on:submit.prevent="submitQuery">
         <p v-if="errors.length">
@@ -44,18 +26,7 @@
       <div class="page">
         <div class="separate-components">
           <div class="centering">
-            <Instruction ref="instruction-3" index="3">
-              <template #shown>
-                <h3>Results</h3>
-              </template>
-
-              <template #hidden>
-                <p>
-                  This the the 'Results' tab, where the results of your query will be shown,
-                  separated into tables. Click on the title of a table to see its rows, and click on a row to add it to your seed set.
-                </p>
-              </template>
-            </Instruction>
+            <h3>Results</h3>
           </div>
 
           <!-- List of tables for results -->
@@ -135,20 +106,7 @@
         <div class="sticky">
           <!-- Display for selected seed set rows -->
           <div class="separate-components centering">
-            <Instruction ref="instruction-4" index="4">
-              <template #shown>
-                <h3>Seed Set</h3>
-              </template>
-
-              <template #hidden>
-                <p>
-                  This is where a preview of your seed set will be displayed. Once you are happy with your seed set,
-                  click the "Use as Seed Set" button to begin the next section of the application.
-                </p>
-              </template>
-
-              <template #button-text>End Tutorial</template>
-            </Instruction>
+            <h3>Seed Set</h3>
             <p v-if="table['numRows'] === 0">No seed set rows have been selected</p>
             <div v-else>
               <!-- Table content -->
@@ -172,16 +130,12 @@
 import Logo from "./Logo.vue";
 import ResultService from "../getResults.js";
 import UserTable from "./UserTable.vue";
-import Instruction from "./Instruction.vue";
-// // import Overtop from "./Overtop.vue"
 
 export default {
   name: "SeedSet",
   components: {
     Logo,
     UserTable,
-    Instruction,
-    // Overtop
   },
 
   data: function() {
@@ -196,32 +150,6 @@ export default {
   },
 
   methods: {
-    async showInstructions() {
-      var inputButtons = this.document.querySelectorAll(
-        "button:not(.instruction-button), input, label"
-      );
-
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = true;
-        inp.classList.toggle("deactivate");
-      }
-
-      for (
-        let i = 1;
-        i < document.querySelectorAll(".instruction-component").length + 1;
-        i++
-      ) {
-        await this.$refs[`instruction-${i}`].handleClick();
-      }
-
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = false;
-        inp.classList.toggle("deactivate");
-      }
-    },
-
-    /* Use single button in corner as measure of when to increment i */
-
     submitQuery() {
       /* Submits the keyword query to the backend,
        * assigns the result of the query (after formatting)

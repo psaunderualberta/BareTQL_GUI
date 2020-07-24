@@ -2,18 +2,8 @@
   <div>
     <div class="centering">
       <Logo />
-      <Instruction ref="instruction-1" index="1">
-        <template #hidden>
-          <p>
-            This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
-            in the previous section and find different rows in the database that match the seed set, based on parameters that you have set.
-          </p>
-        </template>
-      </Instruction>
-      <button @click="showInstructions" style="margin-bottom:1%;">Learn about Part 2 of BareTQL</button>
-      <br />
-
       <button @click="goBack">Return to Keyword Search</button>
+      <hr>
     </div>
     <div class="separate-components centering">
       <h3>Seed Set</h3>
@@ -27,23 +17,6 @@
       </div>
 
       <!-- Deletion buttons, Sliders -->
-      <Instruction ref="instruction-3" index="3">
-        <template #hidden>
-          <p>
-            These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
-            how similar you want the expanded rows to be for that column. 100% means only choose values that are currently in the column,
-            0% means we can choose any values, and anything in between is a proportion of each.
-          </p>
-        </template>
-      </Instruction>
-      <Instruction ref="instruction-4" index="4">
-        <template #hidden>
-          <p>
-            You can also delete a column by clicking on the 'delete column' button above each one.
-            <br />You can delete more than one column at the same time, as you will be prompted before the deletion will occur.
-          </p>
-        </template>
-      </Instruction>
       <div class="table">
         <tbody>
           <tr>
@@ -73,24 +46,7 @@
           </tr>
         </tbody>
       </div>
-      <Instruction ref="instruction-2" index="2">
-        <template #hidden>
-          <p>
-            These are the values of your seed set. If you want to swap values, simply click on the values
-            you want to swap and a button will appear that will allow you to swap.
-          </p>
-        </template>
-      </Instruction>
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
-
-      <Instruction ref="instruction-5" index="5">
-        <template #hidden>
-          <p>
-            These are the operations with which you can expand your seed set.
-            <br />XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
-          </p>
-        </template>
-      </Instruction>
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
       <button
         id="dot-op-submit"
@@ -102,15 +58,7 @@
 
     <!-- Result of Set Expansion -->
     <div class="separate-components centering">
-      <Instruction ref="instruction-6" index="6">
-        <template #shown>
-          <h2>Result of Set Expansion</h2>
-        </template>
-
-        <template #hidden>
-          <p>Here are the expanded rows of your seed set.</p>
-        </template>
-      </Instruction>
+      <h2>Result of Set Expansion</h2>
       <hr style="width: 80%;" />
       <h3
         v-if="!bootUp "
@@ -126,7 +74,6 @@ import Logo from "./Logo.vue";
 import ButtonList from "./ButtonList.vue";
 import UserTable from "./UserTable.vue";
 import ResultService from "../getResults";
-import Instruction from "./Instruction.vue";
 
 export default {
   name: "Operations",
@@ -134,7 +81,6 @@ export default {
     Logo,
     ButtonList,
     UserTable,
-    Instruction
   },
 
   data: function() {
@@ -153,30 +99,6 @@ export default {
   },
 
   methods: {
-    async showInstructions() {
-      /* Shows the 'slideshow' of Instruction components */
-      var inputButtons = this.document.querySelectorAll(
-        "button:not(.instruction-button), input, labels"
-      );
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = true;
-        inp.classList.toggle("deactivate");
-      }
-
-      for (
-        let i = 1;
-        i < document.querySelectorAll(".instruction-component").length + 1;
-        i++
-      ) {
-        await this.$refs[`instruction-${i}`].handleClick();
-      }
-
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = false;
-        inp.classList.toggle("deactivate");
-      }
-    },
-
     executeDotOp(op) {
       /* Executes the dot op selected by user */
       var changeButtons = function(buttons, content) {
