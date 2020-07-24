@@ -173,13 +173,15 @@ import Logo from "./Logo.vue";
 import ResultService from "../getResults.js";
 import UserTable from "./UserTable.vue";
 import Instruction from "./Instruction.vue";
+// // import Overtop from "./Overtop.vue"
 
 export default {
   name: "SeedSet",
   components: {
     Logo,
     UserTable,
-    Instruction
+    Instruction,
+    // Overtop
   },
 
   data: function() {
@@ -239,7 +241,7 @@ export default {
       // https://vuejs.org/v2/cookbook/form-validation.html
       if (keywords.length > 0) {
         changeButton(submitButton, "Loading...");
-        ResultService.getKeywords(keywords)
+        ResultService.getKeywords(keywords.toLowerCase())
           .then(data => {
             changeButton(submitButton, "Submit Query");
             this.results = data;

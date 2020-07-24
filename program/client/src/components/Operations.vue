@@ -230,7 +230,6 @@ export default {
         if (data["rows"].length > 0 && data["rows"][0].length > 0) {
           data["rows"].forEach(row => {
             row = row.split(" || ");
-            cellCount += row.filter(cell => cell !== "NULL").length;
             this.numCols = Math.max(this.numCols, row.length);
             tmp["rows"].push(row);
           });

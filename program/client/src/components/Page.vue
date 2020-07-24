@@ -75,7 +75,7 @@ ul {
 }
 
 
-input[type='submit'], button {
+input[type='submit'], button, .hidden-content {
     border: 2px solid rgba(180, 180, 180, 0.8);
     height: 30px;
     border-radius: 2px;
@@ -109,6 +109,7 @@ input[type=checkbox]:checked + label {
 
 .deactivate {
     opacity: 0.5;
+    transition: 0.2s ease;
 }
 
 .page, .separate-components {
