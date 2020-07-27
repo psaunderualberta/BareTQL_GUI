@@ -2,11 +2,13 @@
   <div id="overtop">
     <slot name="logo" id="logo"></slot>
     <Button @click="activate"><slot name="activator" id="activator"></slot></Button>
+    
     <div class="hidden-content">
       <slot class="centering overtop-header" name="header"></slot>
       <div class="overtop-content">
         <slot name="content"></slot>
       </div>
+
       <div class="centering">
         <button id="exit-help" v-on:submit.prevent @click="deactivate">Exit Help</button>
       </div>
@@ -65,10 +67,10 @@ export default {
        Accessed July 24th, 2020 */
 
     /* For Internet Explorer */ 
-    box-shadow: 0 0 0 1000px rgba(0, 0, 0, .3); 
+    box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.8); 
       
     /* For other browsers */ 
-    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .3); 
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.8); 
 }
 
 .hidden-content {

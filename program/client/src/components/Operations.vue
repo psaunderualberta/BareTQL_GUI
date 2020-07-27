@@ -4,7 +4,7 @@
       <Logo />
       <button @click="goBack">Return to Keyword Search</button>
     </div>
-    <div class="separate-components centering">
+    <div v-if="table['rows'].length > 0" class="separate-components centering">
       <h2>Seed Set</h2>
       <hr class='hr-in-separate-components' />
 
@@ -66,21 +66,10 @@
       </div>
 
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <!-- <button
-        id="dot-op-submit"
-        v-if="dotOp.length !== 0"
-        @click="executeDotOp"
-        v-on:submit.prevent
-      >Confirm Selection</button> -->
-
-    <!-- Result of Set Expansion -->
-      <!-- <h2>Result of Set Expansion</h2>
-      <hr class="hr-in-separate-components" />
-      <h3
-        v-if="!bootUp"
-      >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
-      <h4 v-else>No operation selected</h4> '-->
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
+    </div>
+    <div v-else class="centering separate-components">
+      <h3>No seed set is selected. Please return to keyword search.</h3>
     </div>
   </div>
 </template>
