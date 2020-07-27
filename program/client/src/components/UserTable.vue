@@ -4,6 +4,10 @@
       <!-- 'allowSelection' is unnecessary, but keeping for clarity -->
       <button v-on:submit.prevent @click="swap">Swap selected cells</button>
     </div>
+
+    <!-- Allows the pop-ups with more information
+         https://www.w3schools.com/css/css_tooltip.asp 
+         Accessed July 20th 2020 -->
     <div class="table" :id="'user-table-'+id" :style="'table-layout: '+tableLayout+';'">
       <div class="table-row tooltip" v-for="(row, row_index) in table['rows']" :key="row_index">
         <div class="table-cell" v-for="(cell, col_index) in row" :key="col_index">

@@ -37,6 +37,7 @@ export default {
 </script>
 
 <style>
+/* https://designshack.net/articles/trends/best-website-color-schemes/ */
 @import url('https://fonts.googleapis.com/css2?family=PT+Serif&display=swap');
 
 body {
@@ -45,7 +46,13 @@ body {
     font-family: "PT Serif";
 }
 
-hr, label, input[type='submit'], button {
+input[type="text"] {
+  border: 5px solid white;
+  height: 100%;
+  width: 30%;
+}
+
+hr, label, input[type='submit'], button, .slider-values, .col-checkboxes {
     color:#deb992;
 }
 
@@ -73,8 +80,7 @@ ul {
     list-style: none;
 }
 
-
-input[type='submit'], button {
+input[type='submit'], button, .hidden-content {
     border: 2px solid rgba(180, 180, 180, 0.8);
     height: 30px;
     border-radius: 2px;
@@ -87,7 +93,7 @@ input[type=checkbox] {
     display: none;
 }
 
-input[type=checkbox]:checked + label {
+input[type=checkbox]:checked + label, .clicked {
     opacity: 0.5;
 }
 
@@ -106,8 +112,13 @@ input[type=checkbox]:checked + label {
     margin-bottom: 5px;
 }
 
+.info {
+    font-size: 0.8em;
+}
+
 .deactivate {
     opacity: 0.5;
+    transition: 0.2s ease;
 }
 
 .page, .separate-components {
@@ -131,6 +142,10 @@ like an open book */
     margin: 0 5%;
     border-radius: 5px;
     background: #2c2b2b;
+}
+
+.hr-in-separate-components {
+    background-image: linear-gradient(to right, #2c2b2b, #deb992, #2c2b2b);
 }
 
 

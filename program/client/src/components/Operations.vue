@@ -2,69 +2,54 @@
   <div>
     <div class="centering">
       <Logo />
-      <Instruction ref="instruction-1" index="1">
-        <template #hidden>
-          <p>
-            This the second part of the BareTQL application, where set expansion occurs. Here, we take the seed set you chose
-            in the previous section and find different rows in the database that match the seed set, based on parameters that you have set.
-          </p>
-        </template>
-      </Instruction>
-      <button @click="showInstructions" style="margin-bottom:1%;">Learn about Part 2 of BareTQL</button>
-      <br />
-
       <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div class="separate-components centering">
-      <h3>Seed Set: {{ table['rows'].length }} row{{ table['rows'].length - 1 ? 's' : '' }}, {{ numCols }} columns, {{ nullCount }} null values</h3>
+      <h2>Seed Set</h2>
+      <hr class='hr-in-separate-components' />
 
-      <div v-if="deletions.length > 0">
-        <button
-          v-on:submit.prevent
-          type="submit"
-          @click="deleteCols"
-        >Click to delete columns {{ deletions }}</button>
+      <div class="centering">
+        <!-- Uniqueness checkboxes  -->
+        <div class="container">
+          <p>Select unique columns: <br>
+            <span @click="colTagClick($event, uniqueCols)" class="col-checkboxes uniqueTags" v-for="col in numCols" :key="col">
+              {{ col }}.
+            </span>
+          </p>
+        </div>
+
+        <!-- Deletion checkboxes  -->
+        <div class="container">
+          <p>Select columns to delete: <br>
+            <span @click="colTagClick($event, deletions)" class="col-checkboxes deleteTags" v-for="col in numCols" :key="col">
+              {{ col }}.
+            </span>
+          </p>
+          <div class="container" v-if="deletions.length > 0">
+            <button
+              v-on:submit.prevent
+              type="submit"
+              @click="deleteCols"
+            >Confirm Deletions</button>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Deletion buttons, Sliders -->
-      <Instruction ref="instruction-3" index="3">
-        <template #hidden>
-          <p>
-            These are where you can adjust the settings of your seed set. In particular, the slider above each column determines
-            how similar you want the expanded rows to be for that column. 100% means only choose values that are currently in the column,
-            0% means we can choose any values, and anything in between is a proportion of each.
-          </p>
-        </template>
-      </Instruction>
-      <Instruction ref="instruction-4" index="4">
-        <template #hidden>
-          <p>
-            You can also delete a column by clicking on the 'delete column' button above each one.
-            <br />You can delete more than one column at the same time, as you will be prompted before the deletion will occur.
-          </p>
-        </template>
-      </Instruction>
+      <!-- Sliders -->
       <div class="table">
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
-              <div style="text-align: left;">
-                <span>
-                  <input type="checkbox" :id="'unique'+col" :value="col" v-model="uniqueCols" />
-                  <label :for="'unique'+col" style="padding: 0.5%;">Unique</label>
-                </span>
-                <span style="float: right;">
-                  <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions" />
-                  <label :for="'delete'+col" style="padding-right: 1%">X</label>
-                </span>
-              </div>
-              <div style="float: none;">
+              <p style="margin: 0; text-align: left;">
+                {{ col }}.<span v-if="uniqueCols.indexOf(col) !== -1">***</span>
+              </p>
+              <div>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value=" "
                   class="slider"
                   v-model="sliderValues[col - 1]"
                 />
@@ -73,49 +58,28 @@
           </tr>
         </tbody>
       </div>
-      <Instruction ref="instruction-2" index="2">
-        <template #hidden>
-          <p>
-            These are the values of your seed set. If you want to swap values, simply click on the values
-            you want to swap and a button will appear that will allow you to swap.
-          </p>
-        </template>
-      </Instruction>
-      <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
 
-      <Instruction ref="instruction-5" index="5">
-        <template #hidden>
-          <p>
-            These are the operations with which you can expand your seed set.
-            <br />XR adds more rows, XC adds more columns, and Fill fills any null values you may have.
-          </p>
-        </template>
-      </Instruction>
+      <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
+      
+      <div class="centering info">
+        <p>'***': This column has been tagged as unique.</p>
+      </div>
+
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <button
+      <!-- <button
         id="dot-op-submit"
         v-if="dotOp.length !== 0"
         @click="executeDotOp"
         v-on:submit.prevent
-      >Confirm Selection</button>
-    </div>
+      >Confirm Selection</button> -->
 
     <!-- Result of Set Expansion -->
-    <div class="separate-components centering">
-      <Instruction ref="instruction-6" index="6">
-        <template #shown>
-          <h2>Result of Set Expansion</h2>
-        </template>
-
-        <template #hidden>
-          <p>Here are the expanded rows of your seed set.</p>
-        </template>
-      </Instruction>
-      <hr style="width: 80%;" />
+      <!-- <h2>Result of Set Expansion</h2>
+      <hr class="hr-in-separate-components" />
       <h3
-        v-if="!bootUp "
+        v-if="!bootUp"
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
-      <h4 v-else>No operation selected</h4>
+      <h4 v-else>No operation selected</h4> '-->
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
@@ -126,7 +90,6 @@ import Logo from "./Logo.vue";
 import ButtonList from "./ButtonList.vue";
 import UserTable from "./UserTable.vue";
 import ResultService from "../getResults";
-import Instruction from "./Instruction.vue";
 
 export default {
   name: "Operations",
@@ -134,7 +97,6 @@ export default {
     Logo,
     ButtonList,
     UserTable,
-    Instruction
   },
 
   data: function() {
@@ -147,37 +109,12 @@ export default {
       uniqueCols: [],
       deletions: [],
       bootUp: true,
-      nullCount: 0,
       numCols: 0,
-      dotOp: ""
+      dotOp: "",
     };
   },
 
   methods: {
-    async showInstructions() {
-      /* Shows the 'slideshow' of Instruction components */
-      var inputButtons = this.document.querySelectorAll(
-        "button:not(.instruction-button), input, labels"
-      );
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = true;
-        inp.classList.toggle("deactivate");
-      }
-
-      for (
-        let i = 1;
-        i < document.querySelectorAll(".instruction-component").length + 1;
-        i++
-      ) {
-        await this.$refs[`instruction-${i}`].handleClick();
-      }
-
-      for (let inp of Object.values(inputButtons)) {
-        inp.disabled = false;
-        inp.classList.toggle("deactivate");
-      }
-    },
-
     executeDotOp(op) {
       /* Executes the dot op selected by user */
       var changeButtons = function(buttons, content) {
@@ -193,7 +130,7 @@ export default {
 
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
         .then(data => {
-          changeButtons(submitButtons, "Click to perform operation");
+          changeButtons(submitButtons, this.functions[0]['message']);
           this.bootUp = false;
           this.expandedRows = this.handleResponse(data);
         })
@@ -207,7 +144,8 @@ export default {
       /* Deletes all columns that the user has selected */
       ResultService.deleteCols(this.deletions)
         .then(data => {
-          this.table = this.handleResponse(data, true);
+          this.table = this.handleResponse(data);
+          document.querySelectorAll('.deleteTags').forEach(tag => {tag.classList.remove('clicked')})
           this.deletions = [];
         })
         .catch(err => {
@@ -215,9 +153,8 @@ export default {
         });
     },
 
-    handleResponse(data, seedSet = false) {
+    handleResponse(data) {
       /* handles the response from the API when receiving a modified seed set */
-      var cellCount = 0;
       var tmp = { rows: [], info: [] };
       this.numCols = 0;
       this.sliderValues = [];
@@ -232,14 +169,10 @@ export default {
         if (data["rows"].length > 0 && data["rows"][0].length > 0) {
           data["rows"].forEach(row => {
             row = row.split(" || ");
-            cellCount += row.filter(cell => cell !== "NULL").length;
             this.numCols = Math.max(this.numCols, row.length);
             tmp["rows"].push(row);
           });
         }
-
-        if (seedSet)
-          this.nullCount = tmp["rows"].length * this.numCols - cellCount;
       }
 
       return tmp;
@@ -249,7 +182,7 @@ export default {
       /* Swaps the two cells selected by the user */
       ResultService.swapCells(indices)
         .then(data => {
-          this.table = this.handleResponse(data, true);
+          this.table = this.handleResponse(data);
         })
         .catch(err => {
           console.log(err);
@@ -260,6 +193,21 @@ export default {
       /* Emits a function to change the screen back to keyword search */
       this.$emit("ChangeMode");
     },
+
+    colTagClick(event, target) {
+      /* Add / remove the clicked column 
+       * from deletions / uniqueCols */
+      var val = Number(event.target.textContent);
+      var iO = target.indexOf(val);
+      if (iO !== -1) {
+        target.splice(iO, 1)
+        event.target.classList.remove('clicked')
+      } else {
+        target.push(val)
+        event.target.classList.add('clicked');
+      }
+      return
+    },  
 
     stickiness(stickyValue) {
       /* Determine 'stickiness' value to be displayed */
@@ -274,7 +222,7 @@ export default {
     /* Initial call to get the Seed Set from the API */
     ResultService.handleDotOps(undefined, this.sliderValues, this.uniqueCols)
       .then(data => {
-        this.table = this.handleResponse(data, true);
+        this.table = this.handleResponse(data);
       })
       .catch(err => {
         console.log(err);
@@ -292,23 +240,43 @@ export default {
 
 
 <style scoped>
+
+p {
+  margin: 0;
+}
+
+input[type="text"] {
+  margin: 1% 2%;
+  width: 20%
+}
+
 .compress {
   width: 50%;
   justify-content: center;
 }
 
+.container {
+  padding: 2%;
+  margin-bottom: 0.5%;
+  display: inline-block;
+}
+
+.col-checkboxes {
+  padding: 3%;
+}
+
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
 /* The slider itself */
 .slider {
-  -webkit-appearance: none; /* Override default CSS styles */
+  -webkit-appearance: none;  /* Override default CSS styles */
   appearance: none;
   width: 100%; /* Full-width */
-  height: 40%; /* Specified height */
+  height: 15px; /* Specified height */
   background: #d3d3d3; /* Grey background */
   outline: none; /* Remove outline */
   opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
-  -webkit-transition: 0.2s; /* 0.2 seconds transition on hover */
-  transition: opacity 0.2s;
+  -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+  transition: opacity .2s;
 }
 
 /* Mouse-over effects */
@@ -320,14 +288,17 @@ export default {
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none; /* Override default look */
   appearance: none;
-  width: 10%; /* Set a specific slider handle width */
-  height: 100%; /* Slider handle height */
-  background: #4caf50; /* Green background */
+  width: 15%; /* Set a specific slider handle width */
+  height: 15px; /* Slider handle height */
+  background: #deb992; /* Green background */
+  cursor: pointer; /* Cursor on hover */
 }
 
 .slider::-moz-range-thumb {
-  width: 10%; /* Set a specific slider handle width */
-  height: 100%; /* Slider handle height */
-  background: #4caf50; /* Green background */
+  width: 15%; /* Set a specific slider handle width */
+  height: 15px; /* Slider handle height */
+  border-radius: 0;
+  background: #deb992; /* Green background */
+  cursor: pointer; /* Cursor on hover */
 }
 </style>
