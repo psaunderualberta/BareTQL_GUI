@@ -7,7 +7,7 @@
     <div class="centering">
       
       <!-- Form to submit keyword queries -->
-      <form v-on:submit.prevent="submitQuery">
+      <form v-on:submit.prevent="submitQuery" style="padding-top: 1%;">
         <p v-if="errors.length">
           <strong>Please enter at least one keyword</strong>
         </p>
@@ -96,8 +96,8 @@
           <p
             v-else-if="typeof results === 'string'"
             class="centering"
-          >Enter keywords and see the rows in our database which match!</p>
-          <p v-else class="centering">No results for the previous query.</p>
+          >Enter keywords and see the rows in your database which qmatch!</p>
+          <p v-else class="centering">No results for the previous uery.</p>
         </div>
       </div>
 
@@ -231,7 +231,6 @@ export default {
 
     makeKeywordsBold(str, keywords) {
       /* Make all keywords appear bold in result
-       * TODO: 'this' refers methods (dunno why), so we pass the keywords by value
        * https://x-team.com/blog/highlight-text-vue-regex/
        * Accessed June 9th, 2020
        */
@@ -269,14 +268,7 @@ export default {
 };
 </script>
 
-
 <style scoped>
-
-input[type="text"] {
-  border: 5px solid white;
-  height: 100%;
-  width: 30%;
-}
 
 .top-most-li {
   margin: 1%;

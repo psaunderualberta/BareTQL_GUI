@@ -16,7 +16,7 @@
             <p>
                 Welcome to BareTQL! BareTQL is a tool which provides the ability to 
                 search through a data lake that either you or we provide in order to find similar
-                rows to those deemed as 'interesting'. You can download our database file from (???). It has a size of 700MB.
+                rows to those deemed as 'interesting'. You can download our database file from (???). It has a size of 700MB, so make sure you have enough space to download it.
                 <br>
                 There are two main components to BareTQL: 
                 <ul>

@@ -43,8 +43,6 @@ class Database {
 
         this.functions = {
             xr: this.xr,
-            xc: this.xc,
-            fill: this.fill,
         }
 
         this.cellSep = ' || '
@@ -64,7 +62,7 @@ class Database {
          * of two numerical columns being related
          * https://en.wikipedia.org/wiki/Welch%27s_t-test
          * Accessed June 23 2020 */
-        this.db.function('T_TEST', (arr1, arr2) => {
+        this.db.function('T_TEST', { deterministic: true }, (arr1, arr2) => {
 
             arr1 = JSON.parse(arr1).map(num => Number(num))
             arr2 = JSON.parse(arr2).map(num => Number(num))
@@ -72,7 +70,7 @@ class Database {
             return this.ttestCases(arr1, arr2)
         })
 
-        this.db.function('SEM', (arr) => {
+        this.db.function('SEM', { deterministic: true }, (arr) => {
             arr = JSON.parse(arr).map(num => Number(num))
 
             if (arr.length === 0) { // Entire column is NULL, don't want in result
@@ -82,7 +80,7 @@ class Database {
             return statistics.standardDeviation(arr) / (Math.sqrt(arr.length)) // division by 0 won't happen
         })
 
-        this.db.function('OVERLAP_SIM', (ssCol, keyCol) => {
+        this.db.function('OVERLAP_SIM', { deterministic: true }, (ssCol, keyCol) => {
             ssCol = JSON.parse(ssCol).map(v => String(v))
             keyCol = JSON.parse(keyCol)
 

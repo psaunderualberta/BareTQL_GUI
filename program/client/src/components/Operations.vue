@@ -3,41 +3,53 @@
     <div class="centering">
       <Logo />
       <button @click="goBack">Return to Keyword Search</button>
-      <hr>
     </div>
     <div class="separate-components centering">
-      <h3>Seed Set</h3>
+      <h2>Seed Set</h2>
+      <hr class='hr-in-separate-components' />
 
-      <div v-if="deletions.length > 0">
-        <button
-          v-on:submit.prevent
-          type="submit"
-          @click="deleteCols"
-        >Click to delete columns {{ deletions }}</button>
+      <div class="centering">
+        <!-- Uniqueness checkboxes  -->
+        <div class="container">
+          <p>Tag unique columns: <br>
+            <span @click="colTagClick($event, uniqueCols)" class="col-checkboxes uniqueTags" v-for="col in numCols" :key="col">
+              {{ col }}.
+            </span>
+          </p>
+        </div>
+
+        <!-- Deletion checkboxes  -->
+        <div class="container">
+          <p>Select columns to delete: <br>
+            <span @click="colTagClick($event, deletions)" class="col-checkboxes deleteTags" v-for="col in numCols" :key="col">
+              {{ col }}.
+            </span>
+          </p>
+          <div class="container" v-if="deletions.length > 0">
+            <button
+              v-on:submit.prevent
+              type="submit"
+              @click="deleteCols"
+            >Confirm Deletions</button>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Deletion buttons, Sliders -->
+      <!-- Sliders -->
       <div class="table">
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
-              <div style="text-align: left;">
-                <span>
-                  <input type="checkbox" :id="'unique'+col" :value="col" v-model="uniqueCols" />
-                  <label :for="'unique'+col" style="padding: 0.5%;">Unique</label>
-                </span>
-                <span style="float: right;">
-                  <input type="checkbox" :id="'delete'+col" :value="col" v-model="deletions" />
-                  <label :for="'delete'+col" style="padding-right: 1%">X</label>
-                </span>
-              </div>
+              <p style="margin: 0; text-align: left;">
+                {{ col }}.<span v-if="uniqueCols.indexOf(col) !== -1">***</span>
+              </p>
               <div>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value=" "
                   class="slider"
                   v-model="sliderValues[col - 1]"
                 />
@@ -54,14 +66,12 @@
         @click="executeDotOp"
         v-on:submit.prevent
       >Confirm Selection</button>
-    </div>
 
     <!-- Result of Set Expansion -->
-    <div class="separate-components centering">
       <h2>Result of Set Expansion</h2>
-      <hr style="width: 80%;" />
+      <hr class="hr-in-separate-components" />
       <h3
-        v-if="!bootUp "
+        v-if="!bootUp"
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
       <h4 v-else>No operation selected</h4>
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
@@ -129,6 +139,7 @@ export default {
       ResultService.deleteCols(this.deletions)
         .then(data => {
           this.table = this.handleResponse(data);
+          document.querySelectorAll('.deleteTags').forEach(tag => {tag.classList.remove('clicked')})
           this.deletions = [];
         })
         .catch(err => {
@@ -177,6 +188,21 @@ export default {
       this.$emit("ChangeMode");
     },
 
+    colTagClick(event, target) {
+      /* Add / remove the clicked column 
+       * from deletions / uniqueCols */
+      var val = Number(event.target.textContent);
+      var iO = target.indexOf(val);
+      if (iO !== -1) {
+        target.splice(iO, 1)
+        event.target.classList.remove('clicked')
+      } else {
+        target.push(val)
+        event.target.classList.add('clicked');
+      }
+      return
+    },  
+
     stickiness(stickyValue) {
       /* Determine 'stickiness' value to be displayed */
       if (typeof stickyValue === "undefined") {
@@ -208,9 +234,29 @@ export default {
 
 
 <style scoped>
+
+p {
+  margin: 0;
+}
+
+input[type="text"] {
+  margin: 1% 2%;
+  width: 20%
+}
+
 .compress {
   width: 50%;
   justify-content: center;
+}
+
+.container {
+  padding: 2%;
+  margin-bottom: 0.5%;
+  display: inline-block;
+}
+
+.col-checkboxes {
+  padding: 3%;
 }
 
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
