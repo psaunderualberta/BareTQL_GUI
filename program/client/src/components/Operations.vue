@@ -11,7 +11,7 @@
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
         <div class="container">
-          <p>Tag unique columns: <br>
+          <p>Select unique columns: <br>
             <span @click="colTagClick($event, uniqueCols)" class="col-checkboxes uniqueTags" v-for="col in numCols" :key="col">
               {{ col }}.
             </span>
@@ -64,22 +64,22 @@
       <div class="centering info">
         <p>'***': This column has been tagged as unique.</p>
       </div>
-      
+
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <button
+      <!-- <button
         id="dot-op-submit"
         v-if="dotOp.length !== 0"
         @click="executeDotOp"
         v-on:submit.prevent
-      >Confirm Selection</button>
+      >Confirm Selection</button> -->
 
     <!-- Result of Set Expansion -->
-      <h2>Result of Set Expansion</h2>
+      <!-- <h2>Result of Set Expansion</h2>
       <hr class="hr-in-separate-components" />
       <h3
         v-if="!bootUp"
       >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
-      <h4 v-else>No operation selected</h4>
+      <h4 v-else>No operation selected</h4> '-->
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
@@ -110,7 +110,7 @@ export default {
       deletions: [],
       bootUp: true,
       numCols: 0,
-      dotOp: ""
+      dotOp: "",
     };
   },
 
@@ -130,7 +130,7 @@ export default {
 
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
         .then(data => {
-          changeButtons(submitButtons, "Click to perform operation");
+          changeButtons(submitButtons, this.functions[0]['message']);
           this.bootUp = false;
           this.expandedRows = this.handleResponse(data);
         })

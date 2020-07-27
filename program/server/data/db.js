@@ -1053,15 +1053,17 @@ class Database {
 
         while (uniqueRows['rows'].length < 10 && rrIndex < rankedRows['rows'].length) {
             if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
+                /* This row is already in the seed set, or has a NULL value */
                 rrIndex++;
-            /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {
+                /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
                     columnSets[i].add(rankedRows['rows'][rrIndex][el])
+
                 uniqueRows['rows'].push(rankedRows['rows'][rrIndex].join(' || '))
                 uniqueRows['info'].push(rankedRows['info'][rrIndex++])
-                /* A unique constraint is broken if we show the row to the user */
             } else
+                /* A unique constraint is broken if we show the row to the user */
                 rrIndex++;
         }
 
@@ -1288,6 +1290,6 @@ class Database {
         this.db.close();
         return
     }
-}
+} 
 
 module.exports = Database;
