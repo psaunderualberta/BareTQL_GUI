@@ -112,6 +112,10 @@ input[type=checkbox]:checked + label, .clicked {
     margin-bottom: 5px;
 }
 
+.info {
+    font-size: 0.8em;
+}
+
 .deactivate {
     opacity: 0.5;
     transition: 0.2s ease;

@@ -58,7 +58,13 @@
           </tr>
         </tbody>
       </div>
+
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
+      
+      <div class="centering info">
+        <p>'***': This column has been tagged as unique.</p>
+      </div>
+      
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
       <button
         id="dot-op-submit"
