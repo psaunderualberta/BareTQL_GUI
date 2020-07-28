@@ -37,7 +37,21 @@
                         selection of rows, click the 'Use as Seed Set' button to proceed to Set Expansion.
                     </li>
                     <li>
-                        (Revamp set expansion page before writing a guide for it.)
+                        Next, a you will be taken to the 'set expansion' page. There are a number of settings and options on this page, but the most important part is the button at the bottom of your screen
+                        that says "Expand Rows (XR)". Once this button is pressed, BareTQL will search through the entire database that you imported and find the rows in the database which best match your seed set.
+                        "Best Match" is a little ambiguous, but it suffices to say that BareTQL looks for tables containing columns that are in some way similar to the columns of your seed set. It then re-arranges
+                        these columns so that they match up, and then ranks each row using a 'distance' metric. It then displays the top 10 rows that BareTQL identified as being the most likely to be related to your
+                        seed set. <br><br>
+
+                        Now, there are a few options that you can use to further refine the results of the set expansion. The most obvious is the large slider found above each column. This 'stickiness' slider is used
+                        to calculate a single column's influence on the output of the set expansion. If one column has a value of '50', and another of '25', BareTQL will consider the column with '50' to be twice as important
+                        as the column with '25', and will reflect this when ranking the output of the rows. Moreover, two columns labelled as '25% sticky' will together have the same influence as a single column with '50% sticky'.
+                        Also, you can label a column as 'unique' or delete a column entirely. 'Unique' forces the rows returned by BareTQL to be unique in a particular column. Columns that are not tagged as 'unique' can 
+                        have repeated values; only the 'unique' column(s) will be unique. 'Delete' is exactly what it sounds like: it deletes a column from the seed set, so that it has no influence on the output of the query. This can 
+                        also be done by setting the slider value to '0% sticky', so only delete if you do not want the row represented in the expanded rows. Since deleting a column cannot be undone, an additional confirmation
+                        step is necessary before deletion will occur. <br><br>
+
+                        Multiple columns can be tagged as 'unique' simultaneously, and similarily with deleting columns.
                     </li>
                 </ol>
 

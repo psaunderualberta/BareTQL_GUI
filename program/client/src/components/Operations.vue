@@ -11,21 +11,26 @@
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
         <div class="container">
-          <p>Select unique columns: <br>
-            <span @click="colTagClick($event, uniqueCols)" class="col-checkboxes uniqueTags" v-for="col in numCols" :key="col">
-              {{ col }}.
-            </span>
+          <p>Select unique columns: <br class="extra-br-spacing">
+            <span 
+              @click="colTagClick($event, uniqueCols)" 
+              class="col-checkboxes uniqueTags" 
+              v-for="col in numCols" :key="col"
+              >{{ col }}.</span>
           </p>
         </div>
 
         <!-- Deletion checkboxes  -->
         <div class="container">
-          <p>Select columns to delete: <br>
-            <span @click="colTagClick($event, deletions)" class="col-checkboxes deleteTags" v-for="col in numCols" :key="col">
-              {{ col }}.
-            </span>
+          <p>Select columns to delete: <br class="extra-br-spacing">
+            <span 
+              @click="colTagClick($event, deletions)" 
+              class="col-checkboxes deleteTags" 
+              v-for="col in numCols" :key="col"
+              >{{ col }}.</span>
           </p>
           <div class="container" v-if="deletions.length > 0">
+            <div style="height: 3px"></div>
             <button
               v-on:submit.prevent
               type="submit"
@@ -262,7 +267,14 @@ input[type="text"] {
 }
 
 .col-checkboxes {
-  padding: 3%;
+  padding: 0 2%;
+  margin: 2%;
+  cursor: pointer;
+}
+
+.extra-br-spacing {
+    display: block; 
+    margin: 3px 0;
 }
 
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
