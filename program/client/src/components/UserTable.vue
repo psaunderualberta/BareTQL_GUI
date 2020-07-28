@@ -25,15 +25,18 @@
         </div>
       </div>
     </div>
+    <div>
+      <slot name="between-table-downloads"></slot>
+    </div>
     <div v-if="downloadable && table['rows'].length > 0">
       <button
         @click="exportTableToCSV('BareTQL.csv', true)"
         >Download Expanded rows
       </button>
-      <div style="margin: 0 5px;"></div>
+      <span style="margin: 0 5px;"></span>
       <button
         @click="exportTableToCSV('BareTQL.csv', false)"
-        >Download Seed Set and Expanded Rows
+        >Download Seed Set &amp; Expanded Rows
       </button>
     </div>
   </div>

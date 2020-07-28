@@ -63,15 +63,18 @@
           </tr>
         </tbody>
       </div>
-
+      <br>
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
+      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="fixed">
+        <template #between-table-downloads>
+          <hr class="hr-in-separate-components">
+          <div class="centering info">
+            <p>'***': This column has been tagged as unique.</p>
+          </div>
+          <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
+        </template>
+      </UserTable>
       
-      <div class="centering info">
-        <p>'***': This column has been tagged as unique.</p>
-      </div>
-
-      <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
 </template>
@@ -243,6 +246,15 @@ input[type="text"] {
 input[type="range"] {
   margin-top: 5px;
   margin-bottom: 0;
+}
+
+.display-inline-block {
+  display: inline-block;
+}
+
+.legend-colour-box {
+  height: 10px;
+  width: 10px;
 }
 
 .compress {

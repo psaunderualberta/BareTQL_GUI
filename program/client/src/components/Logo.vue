@@ -5,7 +5,7 @@
         </template>
 
         <template #activator>
-            Need Help?
+            <Button>Need Help?</Button>
         </template>
 
         <template #header>

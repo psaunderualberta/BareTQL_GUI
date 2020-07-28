@@ -98,7 +98,7 @@ input[type=checkbox]:checked + label, .clicked {
 }
 
 .table, .slider-values {
-    color:#c9b070;
+    color:#c0a763;
 }
 
 .sticky {
