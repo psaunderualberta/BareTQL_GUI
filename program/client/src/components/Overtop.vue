@@ -1,8 +1,14 @@
 <template>
   <div id="overtop">
-    
-    <slot name="logo" id="logo"></slot>
-    <span @click="activate"><slot name="activator" id="activator"></slot></span>
+    <div id="container">
+      <div></div>
+      <div>
+        <slot name="logo" id="logo"></slot>
+      </div>
+      <div>
+        <span @click="activate"><slot name="activator" id="activator"></slot></span>
+      </div>
+    </div>
     <div class="hidden-content">
       <slot class="centering overtop-header" name="header"></slot>
       <div class="overtop-content">
@@ -83,6 +89,15 @@ export default {
   z-index: 9999;
   transition: 0.25s ease;
   overflow: auto;
+}
+
+#container {
+  display: flex;                  /* establish flex container */
+  justify-content: space-between; /* switched from default (flex-start, see below) */
+}
+
+#container > div {
+  width: 200px;
 }
 
 </style>

@@ -1,11 +1,11 @@
 <template>
     <Overtop>
         <template #logo>
-            <h1>BareTQL</h1>
+            <h1 style="margin: 0 auto;">BareTQL</h1>
         </template>
 
         <template #activator>
-            <Button>Need Help?</Button>
+            <p style="float: right;"><u>Need Help?</u></p>
         </template>
 
         <template #header>
