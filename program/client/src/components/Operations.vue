@@ -38,7 +38,6 @@
             >Confirm Deletions</button>
           </div>
         </div>
-
       </div>
 
       <!-- Sliders -->
@@ -46,10 +45,11 @@
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
-              <p style="margin: 0; text-align: left;">
-                {{ col }}.<span v-if="uniqueCols.indexOf(col) !== -1">***</span>
-              </p>
               <div>
+                <p style="text-align: left; font-size: 1.1em; position: absolute;">
+                  <span style="">{{ col }}.</span>
+                  <span v-if="uniqueCols.indexOf(col) !== -1">***</span>
+                </p>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
                 <input
                   type="range"
@@ -71,20 +71,6 @@
       </div>
 
       <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <!-- <button
-        id="dot-op-submit"
-        v-if="dotOp.length !== 0"
-        @click="executeDotOp"
-        v-on:submit.prevent
-      >Confirm Selection</button> -->
-
-    <!-- Result of Set Expansion -->
-      <!-- <h2>Result of Set Expansion</h2>
-      <hr class="hr-in-separate-components" />
-      <h3
-        v-if="!bootUp"
-      >Expanded Rows: {{ expandedRows['rows'].length }} rows found</h3>
-      <h4 v-else>No operation selected</h4> '-->
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
   </div>
@@ -108,7 +94,6 @@ export default {
     return {
       functions: [{ message: "Expand Rows (XR)", value: "XR" }],
       expandedRows: { rows: [], info: [] },
-      document: document,
       table: {rows: []},
       sliderValues: [],
       uniqueCols: [],
@@ -255,6 +240,11 @@ input[type="text"] {
   width: 20%
 }
 
+input[type="range"] {
+  margin-top: 5px;
+  margin-bottom: 0;
+}
+
 .compress {
   width: 50%;
   justify-content: center;
@@ -276,6 +266,7 @@ input[type="text"] {
     display: block; 
     margin: 3px 0;
 }
+
 
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
 /* The slider itself */
