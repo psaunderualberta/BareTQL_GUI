@@ -46,7 +46,7 @@
           <tr>
             <td v-for="col in numCols" :key="col">
               <div>
-                <p style="text-align: left; font-size: 1.1em; position: absolute;">
+                <p style="text-align: left; position: absolute;">
                   <span style="">{{ col }}.</span>
                   <span v-if="uniqueCols.indexOf(col) !== -1">***</span>
                 </p>
@@ -115,7 +115,7 @@ export default {
         }
       };
 
-      var submitButtons = this.document.querySelectorAll(".Operations");
+      var submitButtons = document.querySelectorAll(".Operations");
       changeButtons(submitButtons, "Loading Results...");
 
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
@@ -293,7 +293,7 @@ input[type="range"] {
   appearance: none;
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
-  background: #deb992; /* Green background */
+  background: #deb992; 
   cursor: pointer; /* Cursor on hover */
 }
 
@@ -301,7 +301,7 @@ input[type="range"] {
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
   border-radius: 0;
-  background: #deb992; /* Green background */
+  background: #deb992; 
   cursor: pointer; /* Cursor on hover */
 }
 </style>
