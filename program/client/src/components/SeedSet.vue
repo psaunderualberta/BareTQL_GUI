@@ -96,8 +96,8 @@
           <p
             v-else-if="typeof results === 'string'"
             class="centering"
-          >Enter keywords and see the rows in your database which qmatch!</p>
-          <p v-else class="centering">No results for the previous uery.</p>
+          >Enter keywords and see the rows in your database which match!</p>
+          <p v-else class="centering">No results for the previous query.</p>
         </div>
       </div>
 

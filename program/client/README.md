@@ -1,4 +1,4 @@
-# client
+# baretql
 
 ## Project setup
 ```
