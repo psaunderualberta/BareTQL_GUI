@@ -6,7 +6,7 @@
         <slot name="logo" id="logo"></slot>
       </div>
       <div>
-        <span @click="activate"><slot name="activator" id="activator"></slot></span>
+        <span id="activator" @click="activate"><slot name="activator" ></slot></span>
       </div>
     </div>
     <div class="hidden-content">
@@ -54,10 +54,21 @@ export default {
   margin: 0 auto;
 }
 
+#activator {
+  cursor: pointer;
+}
+
+#exit-help {
+  margin-top: 15px;
+}
+
 .overtop-content {
   padding: 0 5%;
   text-align: left;
   line-height: 1.5em;
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 5px;
 }
 
 .overtop-content ul {
@@ -88,7 +99,6 @@ export default {
   margin: auto;
   z-index: 9999;
   transition: 0.25s ease;
-  overflow: auto;
 }
 
 /* 
