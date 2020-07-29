@@ -80,7 +80,7 @@ ul {
     list-style: none;
 }
 
-input[type='submit'], button, .hidden-content {
+input[type='submit'], button, .hidden-content, .col-checkboxes {
     border: 2px solid rgba(180, 180, 180, 0.8);
     height: 30px;
     border-radius: 2px;
@@ -97,8 +97,8 @@ input[type=checkbox]:checked + label, .clicked {
     opacity: 0.5;
 }
 
-.table {
-    color:#c9b070;
+.table, .slider-values {
+    color:#c0a763;
 }
 
 .sticky {

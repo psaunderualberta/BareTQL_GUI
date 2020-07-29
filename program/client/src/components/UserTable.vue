@@ -25,10 +25,20 @@
         </div>
       </div>
     </div>
-    <button
-      v-if="downloadable && table['rows'].length > 0"
-      @click="exportTableToCSV('BareTQL.csv')"
-    >Download as .csv</button>
+    <div>
+      <slot name="between-table-downloads"></slot>
+    </div>
+    <div v-if="downloadable && table['rows'].length > 0">
+      <button
+        @click="exportTableToCSV('BareTQL.csv', true)"
+        >Download Expanded rows
+      </button>
+      <span style="margin: 0 5px;"></span>
+      <button
+        @click="exportTableToCSV('BareTQL.csv', false)"
+        >Download Seed Set &amp; Expanded Rows
+      </button>
+    </div>
   </div>
 </template>
 
@@ -124,12 +134,16 @@ export default {
       downloadLink.click();
     },
 
-    exportTableToCSV(filename) {
+    exportTableToCSV(filename, single_table) {
       /* Downloads the csv file */
       var csv = [];
-      var rows = document.querySelectorAll(
-        `#user-table-${this.id.replace(".", "\\.")} div.table-row`
-      );
+      var rows;
+      if (single_table)
+        rows = document.querySelectorAll(
+          `#user-table-${this.id.replace(".", "\\.")} div.table-row`
+        );
+      else 
+        rows = document.querySelectorAll('div.table div.table-row');
 
       for (var i = 0; i < rows.length; i++) {
         var row = [],

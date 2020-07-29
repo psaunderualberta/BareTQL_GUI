@@ -5,7 +5,7 @@
         </template>
 
         <template #activator>
-            Need Help?
+            <p style="margin-top: 25px;"><u>Need Help?</u></p>
         </template>
 
         <template #header>

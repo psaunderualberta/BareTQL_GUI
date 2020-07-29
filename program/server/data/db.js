@@ -499,7 +499,7 @@ class Database {
         var params = [];
         var stmt = "";
 
-        var getFirstCol = function (seedSet, type, slider, arr, ) {
+        var getFirstCol = function (seedSet, type, slider, arr,) {
             for (let i = 0; i < seedSet['types'].length; i++) {
                 if (seedSet['types'][i] !== type || seedSet['sliders'][i] === 0)
                     continue
@@ -991,7 +991,7 @@ class Database {
 
                 /* Get max of each column, across all rows measured */
                 maxes = maxes.map(arr => arr.reduce((a, b) => Math.max(a, b), 0))
-                
+
                 /* For each row, divide each column score for that 
                  * row by the maximum similarity score for that column
                  * across ALL rows scored. That is, normalize each array of scores (one for each column)
@@ -1012,7 +1012,7 @@ class Database {
 
 
                 /* Sort the rows in ascending order according to score */
-                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] }); 
+                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] });
                 var tmp = { rows: [], info: [] }
 
                 /* RegExp for inserting commas into a number
@@ -1052,9 +1052,12 @@ class Database {
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows['rows'].length < 10 && rrIndex < rankedRows['rows'].length) {
-            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
-                /* This row is already in the seed set, or has a NULL value */
+            if (uniqueRows['rows'].concat(this.seedSet['rows'])
+                .indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
+                || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
+                /* This row is already in the seed set, or is in the expanded rows, or has a NULL value */
                 rrIndex++;
+
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {
                 /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
@@ -1128,7 +1131,7 @@ class Database {
          * 
          * Returns:
          * - An array of dtypes */
-        
+
         var types = [];
         var column = [];
         var rows = table.map(row => row.split(' || '))
@@ -1137,22 +1140,22 @@ class Database {
             column = [];
             for (let j = 0; j < rows.length; j++) {
                 if (rows[j][i] !== "NULL")
-                column.push(rows[j][i])
+                    column.push(rows[j][i])
             }
 
             column = column.map(value => isNaN(value));
-            
+
             if (column.indexOf(true) === -1 && column.length > 0)
-            types.push("numerical")
+                types.push("numerical")
             else if (column.length === 0)
-            types.push("NULL")
+                types.push("NULL")
             else
                 types.push("text");
-            }
+        }
 
-            return types
+        return types
     }
-    
+
     ttestCases(arr1, arr2) {
         /* Handles the different cases of the t-test, 
          * returning the p-value in each case 
@@ -1165,18 +1168,18 @@ class Database {
 
         var p;
         if (arr1.length === 0 || arr2.length === 0)
-        return 0 // Lowest p-value possible => worst result (want the best match)
+            return 0 // Lowest p-value possible => worst result (want the best match)
 
         if (arr1.length === 1 && arr2.length === 1)
             p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
-            
-            else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
+
+        else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
             p = 0.98 * (Number(arr1[0] === arr2[0])) + 0.01 // Map between 0.01 and 0.99 to avoid log(0)
 
-            /* If only one row in seedSet's numerical col, use one-sample t-test */
+        /* If only one row in seedSet's numerical col, use one-sample t-test */
         else if (arr1.length === 1)
             p = Number(ttest(arr2, { mu: arr1[0] }).pValue())
-            else
+        else
             p = Number(ttest(arr1, arr2).pValue())
 
         return p
@@ -1213,9 +1216,9 @@ class Database {
          * 
          * Returns:
          * - 2D array with # of sub-arrays equal to # of columns in seed set */
-        return Array.apply(null, Array(this.seedSet['numCols'])).map(() => {return []})
+        return Array.apply(null, Array(this.seedSet['numCols'])).map(() => { return [] })
     }
-    
+
     getQMarks(arr) {
         /* Since the SQL engine uses '?' placeholders in order to format the query,
         * this function determines the number of question marks based on the number
@@ -1290,6 +1293,6 @@ class Database {
         this.db.close();
         return
     }
-} 
+}
 
 module.exports = Database;

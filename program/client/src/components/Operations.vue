@@ -2,30 +2,35 @@
   <div>
     <div class="centering">
       <Logo />
-      <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div v-if="table['rows'].length > 0" class="separate-components centering">
       <h2>Seed Set</h2>
-      <hr class='hr-in-separate-components' />
+      <button @click="goBack">Return to Keyword Search</button>
+      <hr class="hr-in-separate-components">
 
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
         <div class="container">
-          <p>Select unique columns: <br>
-            <span @click="colTagClick($event, uniqueCols)" class="col-checkboxes uniqueTags" v-for="col in numCols" :key="col">
-              {{ col }}.
-            </span>
+          <p>Select unique columns: <br class="extra-br-spacing">
+            <span 
+              @click="colTagClick($event, uniqueCols)" 
+              class="col-checkboxes uniqueTags" 
+              v-for="col in numCols" :key="col"
+              >{{ col }}.</span>
           </p>
         </div>
 
         <!-- Deletion checkboxes  -->
         <div class="container">
-          <p>Select columns to delete: <br>
-            <span @click="colTagClick($event, deletions)" class="col-checkboxes deleteTags" v-for="col in numCols" :key="col">
-              {{ col }}.
-            </span>
+          <p>Select columns to delete: <br class="extra-br-spacing">
+            <span 
+              @click="colTagClick($event, deletions)" 
+              class="col-checkboxes deleteTags" 
+              v-for="col in numCols" :key="col"
+              >{{ col }}.</span>
           </p>
           <div class="container" v-if="deletions.length > 0">
+            <div style="height: 3px"></div>
             <button
               v-on:submit.prevent
               type="submit"
@@ -33,7 +38,6 @@
             >Confirm Deletions</button>
           </div>
         </div>
-
       </div>
 
       <!-- Sliders -->
@@ -41,10 +45,11 @@
         <tbody>
           <tr>
             <td v-for="col in numCols" :key="col">
-              <p style="margin: 0; text-align: left;">
-                {{ col }}.<span v-if="uniqueCols.indexOf(col) !== -1">***</span>
-              </p>
               <div>
+                <p style="text-align: left; position: absolute;">
+                  <span style="">{{ col }}.</span>
+                  <span v-if="uniqueCols.indexOf(col) !== -1">***</span>
+                </p>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
                 <input
                   type="range"
@@ -58,15 +63,17 @@
           </tr>
         </tbody>
       </div>
-
+      <br>
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
+      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="fixed">
+        <template #between-table-downloads>
+          <div class="centering info">
+            <p>'***': This column has been tagged as unique.</p>
+          </div>
+          <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
+        </template>
+      </UserTable>
       
-      <div class="centering info">
-        <p>'***': This column has been tagged as unique.</p>
-      </div>
-
-      <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="auto"/>
     </div>
     <div v-else class="centering separate-components">
       <h3>No seed set is selected. Please return to keyword search.</h3>
@@ -92,7 +99,6 @@ export default {
     return {
       functions: [{ message: "Expand Rows (XR)", value: "XR" }],
       expandedRows: { rows: [], info: [] },
-      document: document,
       table: {rows: []},
       sliderValues: [],
       uniqueCols: [],
@@ -114,7 +120,7 @@ export default {
         }
       };
 
-      var submitButtons = this.document.querySelectorAll(".Operations");
+      var submitButtons = document.querySelectorAll(".Operations");
       changeButtons(submitButtons, "Loading Results...");
 
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
@@ -239,6 +245,20 @@ input[type="text"] {
   width: 20%
 }
 
+input[type="range"] {
+  margin-top: 5px;
+  margin-bottom: 0;
+}
+
+.display-inline-block {
+  display: inline-block;
+}
+
+.legend-colour-box {
+  height: 10px;
+  width: 10px;
+}
+
 .compress {
   width: 50%;
   justify-content: center;
@@ -251,8 +271,16 @@ input[type="text"] {
 }
 
 .col-checkboxes {
-  padding: 3%;
+  padding: 0 2%;
+  margin: 2%;
+  cursor: pointer;
 }
+
+.extra-br-spacing {
+    display: block; 
+    margin: 3px 0;
+}
+
 
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
 /* The slider itself */
@@ -279,7 +307,7 @@ input[type="text"] {
   appearance: none;
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
-  background: #deb992; /* Green background */
+  background: #deb992; 
   cursor: pointer; /* Cursor on hover */
 }
 
@@ -287,7 +315,7 @@ input[type="text"] {
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
   border-radius: 0;
-  background: #deb992; /* Green background */
+  background: #deb992; 
   cursor: pointer; /* Cursor on hover */
 }
 </style>

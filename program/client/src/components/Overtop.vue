@@ -1,8 +1,14 @@
 <template>
   <div id="overtop">
-    <slot name="logo" id="logo"></slot>
-    <Button @click="activate"><slot name="activator" id="activator"></slot></Button>
-    
+    <div id="container">
+      <div></div>
+      <div>
+        <slot name="logo" id="logo"></slot>
+      </div>
+      <div>
+        <span id="activator" @click="activate"><slot name="activator" ></slot></span>
+      </div>
+    </div>
     <div class="hidden-content">
       <slot class="centering overtop-header" name="header"></slot>
       <div class="overtop-content">
@@ -49,10 +55,21 @@ export default {
   margin: 0 auto;
 }
 
+#activator {
+  cursor: pointer;
+}
+
+#exit-help {
+  margin-top: 15px;
+}
+
 .overtop-content {
   padding: 0 5%;
   text-align: left;
   line-height: 1.5em;
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 5px;
 }
 
 .overtop-content ul {
@@ -67,10 +84,10 @@ export default {
        Accessed July 24th, 2020 */
 
     /* For Internet Explorer */ 
-    box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.8); 
+    box-shadow: 0 0 0 1000px rgba(0, 0, 0, .65); 
       
     /* For other browsers */ 
-    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.8); 
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .65); 
 }
 
 .hidden-content {
@@ -83,7 +100,20 @@ export default {
   margin: auto;
   z-index: 9999;
   transition: 0.25s ease;
-  overflow: auto;
+}
+
+/* 
+ * Align 3 divs left - center - right
+ * https://stackoverflow.com/questions/2603700/how-to-align-3-divs-left-center-right-inside-another-div
+ * Accessed July 28, 2020 */
+
+#container {
+  display: flex;                  /* establish flex container */
+  justify-content: space-between; /* switched from default (flex-start, see below) */
+}
+
+#container > div {
+  width: 200px;
 }
 
 </style>
