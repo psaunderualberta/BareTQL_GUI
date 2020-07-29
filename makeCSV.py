@@ -9,7 +9,7 @@ def main():
   # http://stackoverflow.com/questions/5137497/ddg#5137509
   # Accessed July 27th, 2020
   filepath = os.path.dirname(os.path.realpath(__file__))
-  outputFolder = './csv'
+  outputFolder = os.path.join(filepath, 'csv')
 
   db_name = find('database.db', filepath)
 
@@ -17,7 +17,7 @@ def main():
   try:
       conn = sqlite3.connect(db_name)
   except FileNotFoundError:
-      print("Error: No file named 'database.db' in current directory. Exiting.")
+      print("Error: No file named 'database.db' in any subdirectory. Exiting.")
       exit()
   
   c = conn.cursor()

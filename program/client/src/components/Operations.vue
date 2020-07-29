@@ -2,11 +2,11 @@
   <div>
     <div class="centering">
       <Logo />
-      <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div class="separate-components centering">
       <h2>Seed Set</h2>
-      <hr class='hr-in-separate-components' />
+      <button @click="goBack">Return to Keyword Search</button>
+      <hr class="hr-in-separate-components">
 
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
@@ -67,7 +67,6 @@
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="fixed">
         <template #between-table-downloads>
-          <hr class="hr-in-separate-components">
           <div class="centering info">
             <p>'***': This column has been tagged as unique.</p>
           </div>

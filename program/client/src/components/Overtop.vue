@@ -91,6 +91,11 @@ export default {
   overflow: auto;
 }
 
+/* 
+ * Align 3 divs left - center - right
+ * https://stackoverflow.com/questions/2603700/how-to-align-3-divs-left-center-right-inside-another-div
+ * Accessed July 28, 2020 */
+
 #container {
   display: flex;                  /* establish flex container */
   justify-content: space-between; /* switched from default (flex-start, see below) */
