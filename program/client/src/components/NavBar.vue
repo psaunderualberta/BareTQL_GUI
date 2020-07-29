@@ -1,5 +1,5 @@
 <template>
-  <div id="overtop">
+  <div id="NavBar">
     <div id="container">
       <div></div>
       <div>
@@ -10,8 +10,8 @@
       </div>
     </div>
     <div class="hidden-content">
-      <slot class="centering overtop-header" name="header"></slot>
-      <div class="overtop-content">
+      <slot class="centering NavBar-header" name="header"></slot>
+      <div class="NavBar-content">
         <slot name="content"></slot>
       </div>
 
@@ -24,7 +24,7 @@
 
 <script>
 export default {
-  name: "overtop",
+  name: "NavBar",
   methods: {
     changeButtons(become_disabled) {
       document.querySelectorAll('input, button:not(#exit-help), a').forEach(inp => {
@@ -50,7 +50,7 @@ export default {
 
 <style scoped>
 
-#overtop {
+#NavBar {
   width: 80%;
   margin: 0 auto;
 }
@@ -63,7 +63,7 @@ export default {
   margin-top: 15px;
 }
 
-.overtop-content {
+.NavBar-content {
   padding: 0 5%;
   text-align: left;
   line-height: 1.5em;
@@ -72,7 +72,7 @@ export default {
   margin-bottom: 5px;
 }
 
-.overtop-content ul {
+.NavBar-content ul {
   list-style: initial;
 }
 

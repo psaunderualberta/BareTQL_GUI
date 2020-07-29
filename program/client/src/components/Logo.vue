@@ -1,11 +1,12 @@
 <template>
-    <Overtop>
+    <NavBar>
+
         <template #logo>
             <h1>BareTQL</h1>
         </template>
 
         <template #activator>
-            <p style="margin-top: 25px;"><u>Need Help?</u></p>
+            <p style="margin-top: 30px;"><u>Need Help?</u></p>
         </template>
 
         <template #header>
@@ -59,18 +60,18 @@
                 we have provided. Have fun, and thank you for using BareTQL!
             </p>
         </template>
-    </Overtop>
+    </NavBar>
 </template>
 
 
 <script>
-import Overtop from './Overtop.vue'
+import NavBar from './NavBar.vue'
 
 export default {
     name: 'logo',
     components: {
-        Overtop,
-    }
+        NavBar,
+    },
 }
 </script>
 

@@ -52,6 +52,11 @@ input[type="text"] {
   width: 30%;
 }
 
+img {
+    width: 30px;
+    height: 30px;
+}
+
 hr, label, input[type='submit'], button, .slider-values, .col-checkboxes {
     color:#deb992;
 }

@@ -1,7 +1,7 @@
 <template>
   <div id="seed-set">
     <div class="centering" style="margin-bottom: 1%; ">
-      <Logo />
+      <Logo @leftClick="leftClick"/>
     </div>
     <hr>
     <div class="centering">
@@ -55,7 +55,6 @@
                 />
 
                 <label class="read-more-trigger" :for="'_'+table_rank">
-                  List of
                   <span v-html="makeKeywordsBold(table['title'], keywords)"></span>
                   :
                   ({{ Object.keys(results[table_rank]['rows']).length }}
@@ -77,7 +76,7 @@
                       <input
                         type="checkbox"
                         :id="table_rank+'-'+rowID"
-                        :value="logRowInfo(rowContent, rowID, table['table_id'], 'List of' + table['title'])"
+                        :value="logRowInfo(rowContent, rowID, table['table_id'], table['title'])"
                         v-model="selectedRows"
                       />
                       <label
@@ -96,8 +95,8 @@
           <p
             v-else-if="typeof results === 'string'"
             class="centering"
-          >Enter keywords and see the rows in your database which qmatch!</p>
-          <p v-else class="centering">No results for the previous uery.</p>
+          >Enter keywords and see the rows in your database which match!</p>
+          <p v-else class="centering">No results for the previous query.</p>
         </div>
       </div>
 
