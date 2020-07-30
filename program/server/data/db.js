@@ -1032,7 +1032,7 @@ class Database {
 
                 results = tmp;
 
-                results = this.applyUniqueConstraints(results)
+                results = this.applyColumnConstraints(results)
 
                 resolve(results)
             } catch (error) {
@@ -1041,7 +1041,7 @@ class Database {
         })
     }
 
-    applyUniqueConstraints(rankedRows) {
+    applyColumnConstraints(rankedRows) {
         /* Ensures that each column that the user tagged as 'unique' is, in fact, unique.
          * 
          * Arguments:
@@ -1055,10 +1055,9 @@ class Database {
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
         while (uniqueRows['rows'].length < this.rowsReturned && rrIndex < rankedRows['rows'].length) {
-            if (uniqueRows['rows'].concat(this.seedSet['rows'])
-                .indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
+            if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
                 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
-                /* This row is already in the seed set, or is in the expanded rows, or has a NULL value */
+                /* This row is in the expanded rows, or has a NULL value */
                 rrIndex++;
 
             else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {

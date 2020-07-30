@@ -54,8 +54,8 @@ input[type="text"] {
 
 input[type="number"] {
     border: 5px solid white;
-    height: 100%;
-    width: 12%;
+    height: 15px;
+    width: 40px;
     margin-bottom: 5px;
 }
 

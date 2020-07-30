@@ -2,10 +2,10 @@
   <div>
     <div class="centering">
       <Logo />
+      <button @click="goBack">Return to Keyword Search</button>
     </div>
     <div v-if="table['rows'].length > 0" class="separate-components centering">
       <h2>Seed Set</h2>
-      <button @click="goBack">Return to Keyword Search</button>
       <hr class="hr-in-separate-components">
 
       <div class="centering">
@@ -18,6 +18,13 @@
               v-for="col in numCols" :key="col"
               >{{ col }}.</span>
           </p>
+        </div>
+
+        <div class="container">
+          <p v-if="incorrectRowsReturned()">
+            <strong>Please choose a positive integer.</strong>
+          </p>
+          <span>Select number of expanded rows: </span><input type="number" v-model="rowsReturned">
         </div>
 
         <!-- Deletion checkboxes  -->
@@ -38,13 +45,6 @@
             >Confirm Deletions</button>
           </div>
         </div>
-      </div>
-    
-      <div class="container">
-        <p v-if="incorrectRowsReturned()">
-          <strong>Please choose a positive integer.</strong>
-        </p>
-        <span>Select number of expanded rows: </span><input type="number" v-model="rowsReturned">
       </div>
 
       <!-- Sliders -->
