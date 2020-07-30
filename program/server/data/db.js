@@ -1042,17 +1042,29 @@ class Database {
     }
 
     applyColumnConstraints(rankedRows) {
-        /* Ensures that each column that the user tagged as 'unique' is, in fact, unique.
+        /* Ensures that each column that the user tagged as 'unique' is actually unique,
+         * and each column with 100% stickiness has only the values in the seed set.
          * 
          * Arguments:
          * - rankedRows: The rows that are sorted in ascending order according to their score
          * 
          * Returns: 
          * - The top 10 results (or less) that satisfy the user's unique */
-        var columnSets = [];
+        var uniqueSets = [];
+        var stickySets = [];
         var uniqueRows = { rows: [], info: [] };
+        var stickyCols = this.seedSet['sliders'].reduce((arr, cur, i) => {if (cur === 100) arr.push(i); return arr}, [])
         var rrIndex = 0;
-        for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
+        for (const _ of this.seedSet['uniqueCols']) uniqueSets.push(new Set())
+        for (const _ of stickyCols) stickySets.push(new Set())
+
+
+        for (let row of this.seedSet['rows']) {
+            row = row.split(' || ')
+            for (let [i, el] of stickyCols.entries()) {
+                stickySets[i].add(row[el])
+            }
+        }
 
         while (uniqueRows['rows'].length < this.rowsReturned && rrIndex < rankedRows['rows'].length) {
             if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
@@ -1060,10 +1072,13 @@ class Database {
                 /* This row is in the expanded rows, or has a NULL value */
                 rrIndex++;
 
-            else if (this.seedSet['uniqueCols'].map((col, i) => columnSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet === false)) {
-                /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets */
+
+            else if (this.seedSet['uniqueCols'].map((col, i) => uniqueSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => !inSet)
+                    && stickyCols.map((col, i) => stickySets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet)) {
+                /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets,
+                 * every value in rankedRows['rows'][rrIndex] are in the stickyCols' sets */
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
-                    columnSets[i].add(rankedRows['rows'][rrIndex][el])
+                    uniqueSets[i].add(rankedRows['rows'][rrIndex][el])
 
                 uniqueRows['rows'].push(rankedRows['rows'][rrIndex].join(' || '))
                 uniqueRows['info'].push(rankedRows['info'][rrIndex++])
