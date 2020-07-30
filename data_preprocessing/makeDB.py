@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 import regex as re
 import ftfy
 import sys
@@ -19,7 +20,8 @@ keywords_cell_header(keyword, table_id, row_id, col_id, location)
 keywords_title_caption(table_id, location, keyword)
 """
 def main():
-    db_name = './database.db'
+    filepath = os.path.dirname(os.path.realpath(__file__)) # Get location of current file
+    db_name = os.path.join(Path(filepath).parent, 'program', 'server', 'data', 'database.db')
 
     try:
         os.remove(db_name)

@@ -6,14 +6,14 @@ import converter
 
 
 def main():
-    with open(os.path.join('tmp', 'output.txt'), 'w', encoding='utf8') as output:
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'tmp', 'output.txt'), 'w', encoding='utf8') as output:
         rowSizes = []
         colSizes = []
         allColsRemoved = []
 
         tableCount = 0
         successes = 0
-        dirStr = sys.argv[1]
+        dirStr = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'input') # Join abs. path of file with input/
     
         for subDir, _, files in os.walk(dirStr):
             for file in files:

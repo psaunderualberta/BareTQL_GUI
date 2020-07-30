@@ -3,6 +3,7 @@ import html
 import ftfy
 import csv
 import os
+from pathlib import Path
 
 
 def main():
@@ -10,9 +11,10 @@ def main():
   # http://stackoverflow.com/questions/5137497/ddg#5137509
   # Accessed July 27th, 2020
   filepath = os.path.dirname(os.path.realpath(__file__))
+  root = Path(filepath).parent
   outputFolder = os.path.join(filepath, 'csv')
 
-  db_name = find('database.db', filepath)
+  db_name = find('database.db', root)
 
 
   try:
@@ -36,6 +38,10 @@ def main():
       csv_writer.writerow([i[0] for i in c.description]) # write headers
       csv_writer.writerows(c)
       print(f"Finished writing table '{table}'' to csv file.")
+    
+  print("Your .csv files are located in the folder {0}".format(
+      os.path.join(filepath, 'csv')
+  ))
 
 def find(name, path):
     # Find a file in python (returns the first file which matches)
