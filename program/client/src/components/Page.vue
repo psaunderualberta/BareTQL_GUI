@@ -52,6 +52,13 @@ input[type="text"] {
   width: 30%;
 }
 
+input[type="number"] {
+    border: 5px solid white;
+    height: 100%;
+    width: 12%;
+    margin-bottom: 5px;
+}
+
 img {
     width: 30px;
     height: 30px;

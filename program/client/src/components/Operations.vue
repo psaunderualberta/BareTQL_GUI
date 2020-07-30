@@ -39,6 +39,13 @@
           </div>
         </div>
       </div>
+    
+      <div class="container">
+        <p v-if="incorrectRowsReturned()">
+          <strong>Please choose a positive integer.</strong>
+        </p>
+        <span>Select number of expanded rows: </span><input type="number" v-model="rowsReturned">
+      </div>
 
       <!-- Sliders -->
       <div class="table">
@@ -101,6 +108,7 @@ export default {
       expandedRows: { rows: [], info: [] },
       table: {rows: []},
       sliderValues: [],
+      rowsReturned: 10,
       uniqueCols: [],
       deletions: [],
       bootUp: true,
@@ -120,10 +128,14 @@ export default {
         }
       };
 
+      if (this.incorrectRowsReturned()) {
+        return
+      }
+
       var submitButtons = document.querySelectorAll(".Operations");
       changeButtons(submitButtons, "Loading Results...");
 
-      ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols)
+      ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols, this.rowsReturned)
         .then(data => {
           changeButtons(submitButtons, this.functions[0]['message']);
           this.bootUp = false;
@@ -210,6 +222,12 @@ export default {
         return 50;
       }
       return stickyValue;
+    },
+
+    incorrectRowsReturned() {
+      /* Validates that rows returned are positive and an integer */
+      this.rowsReturned = Number(this.rowsReturned)
+      return this.rowsReturned < 0 || !Number.isInteger(this.rowsReturned)
     }
   },
 

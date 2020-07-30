@@ -50,7 +50,7 @@ router.get('/delete', (req, res) => {
 
 router.get('/dot-op', (req, res) => {
     /* Route used when handling dot operations */
-    db.handleDotOps(req.query.dotOp, req.query.sliders, req.query.unique)
+    db.handleDotOps(req.query.dotOp, req.query.sliders, req.query.unique, req.query.rowsReturned)
     .then((result) => {
         res.send(result);
     })

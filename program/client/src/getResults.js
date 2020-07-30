@@ -123,7 +123,7 @@ class ResultService {
         })
     }
 
-    static handleDotOps(dotOp, sliderValues, uniqueCols) {
+    static handleDotOps(dotOp, sliderValues, uniqueCols, rowsReturned) {
         /* Handles all user input once the user has selected a seed set and
          * is choosing dot operations.
          * 
@@ -136,7 +136,7 @@ class ResultService {
          */
         return new Promise((resolve, reject) => {
             try {
-                var url = `${dotOpURL}${dotOp}&sliders=${sliderValues.join('&sliders=')}&unique=${uniqueCols.join('&unique=')}`
+                var url = `${dotOpURL}${dotOp}&sliders=${sliderValues.join('&sliders=')}&unique=${uniqueCols.join('&unique=')}&rowsReturned=${rowsReturned}`
                 axios.get(url)
                     .then((response) => {
                         resolve(response['data']);

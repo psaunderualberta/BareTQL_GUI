@@ -1,7 +1,7 @@
 <template>
   <div id="seed-set">
     <div class="centering" style="margin-bottom: 1%; ">
-      <Logo @leftClick="leftClick"/>
+      <Logo/>
     </div>
     <hr>
     <div class="centering">

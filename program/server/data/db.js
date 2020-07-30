@@ -46,6 +46,7 @@ class Database {
         }
 
         this.cellSep = ' || '
+        this.rowsReturned = 10
 
         /* Aggregate function to turn col into array 
          * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md
@@ -382,7 +383,7 @@ class Database {
         })
     }
 
-    handleDotOps(dotOp, sliderValues, uniqueCols) {
+    handleDotOps(dotOp, sliderValues, uniqueCols, rowsReturned) {
         /* Handles all dot operations, calling the correct functions to mutate the 
          * seed set attribute. The first time this method is called, we are initializing 
          * the operations page and so return the rows of the seed set without changing them.
@@ -402,6 +403,8 @@ class Database {
                 /* Rather than adjusting existing slider values and unique columns,
                  * we just reset all values to those currently set by the user 
                  * (even if they haven't changed) */
+                this.rowsReturned = rowsReturned
+
                 for (let i = 0; i < sliderValues.length; i++) {
                     this.seedSet['sliders'][i] = Number(sliderValues[i])
                 }
@@ -1051,7 +1054,7 @@ class Database {
         var rrIndex = 0;
         for (const _ of this.seedSet['uniqueCols']) columnSets.push(new Set())
 
-        while (uniqueRows['rows'].length < 10 && rrIndex < rankedRows['rows'].length) {
+        while (uniqueRows['rows'].length < this.rowsReturned && rrIndex < rankedRows['rows'].length) {
             if (uniqueRows['rows'].concat(this.seedSet['rows'])
                 .indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
                 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
