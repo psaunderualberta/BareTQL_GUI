@@ -241,7 +241,7 @@ class Database {
         if (changeSeed)
             this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
 
-        this.fillNulls(this.seedSet['rows'])
+        this.fillNulls(this.seedSet['rows'], this.seedSet['numCols'])
 
         /* Group cols only if we have a lot of data, otherwise let the user perform all organization */
         if (grouping && (new Set(this.seedSet['table_ids']).size > 2 || this.seedSet['rows'].length > 10)) {
@@ -428,11 +428,11 @@ class Database {
                     seedCopy = { ...this.seedSet }
 
                     if (typeof results['rows'] !== 'undefined') {
-                        this.fillNulls(results['rows'])
+                        this.fillNulls(results['rows'], this.seedSet['numCols'])
                         seedCopy['rows'] = results['rows']
                         seedCopy['info'] = results['info']
                     } else {
-                        this.fillNulls(results)
+                        this.fillNulls(results, this.seedSet['numCols'])
                         seedCopy['rows'] = results
                     }
 
@@ -1006,11 +1006,12 @@ class Database {
                         res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)))
                     })
                 })
+                
 
                 /* Sum each 2-D array to give a final numerical
                  * score for each row */
                 results.forEach(res => {
-                    res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) + num, 0))
+                    res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) * num, 1))
                 })
 
 
@@ -1055,9 +1056,9 @@ class Database {
         var uniqueRows = { rows: [], info: [] };
         var stickyCols = this.seedSet['sliders'].reduce((arr, cur, i) => {if (cur === 100) arr.push(i); return arr}, [])
         var rrIndex = 0;
+
         for (const _ of this.seedSet['uniqueCols']) uniqueSets.push(new Set())
         for (const _ of stickyCols) stickySets.push(new Set())
-
 
         for (let row of this.seedSet['rows']) {
             row = row.split(' || ')
@@ -1067,23 +1068,30 @@ class Database {
         }
 
         while (uniqueRows['rows'].length < this.rowsReturned && rrIndex < rankedRows['rows'].length) {
+
+            /* This row is in the expanded rows, or has a NULL value */
             if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
                 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
-                /* This row is in the expanded rows, or has a NULL value */
                 rrIndex++;
 
 
-            else if (this.seedSet['uniqueCols'].map((col, i) => uniqueSets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => !inSet)
-                    && stickyCols.map((col, i) => stickySets[i].has(rankedRows['rows'][rrIndex][col])).every(inSet => inSet)) {
-                /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets,
-                 * every value in rankedRows['rows'][rrIndex] are in the stickyCols' sets */
+            /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets,
+                * every value in rankedRows['rows'][rrIndex] are in the stickyCols' sets */
+            else if (this.seedSet['uniqueCols']
+                        .map((col, i) => uniqueSets[i].has(rankedRows['rows'][rrIndex][col]))
+                        .every(inSet => !inSet)
+                    && stickyCols
+                        .map((col, i) => stickySets[i].has(rankedRows['rows'][rrIndex][col]))
+                        .every(inSet => inSet)) {
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
                     uniqueSets[i].add(rankedRows['rows'][rrIndex][el])
 
                 uniqueRows['rows'].push(rankedRows['rows'][rrIndex].join(' || '))
                 uniqueRows['info'].push(rankedRows['info'][rrIndex++])
-            } else
-                /* A unique constraint is broken if we show the row to the user */
+            } 
+            
+            /* A unique constraint is broken if we show the row to the user */
+            else
                 rrIndex++;
         }
 
@@ -1120,8 +1128,8 @@ class Database {
         })
     }
 
-    fillNulls(table) {
-        /* Pad each row with NULL until the table is a rectangle 
+    fillNulls(table, numCols) {
+        /* Pad each row in 'table' with NULL until the table is a rectangle 
          * 
          * Arguments:
          * - table: The table we want to pad with NULLs
@@ -1131,7 +1139,7 @@ class Database {
         var row;
         for (let i = 0; i < table.length; i++) {
             row = table[i].split(' || ')
-            for (let j = row.length; j < this.seedSet['numCols']; j++) row.push("NULL")
+            for (let j = row.length; j < numCols; j++) row.push("NULL")
             table[i] = row.join(' || ')
         }
     }
@@ -1153,21 +1161,23 @@ class Database {
         var column = [];
         var rows = table.map(row => row.split(' || '))
 
-        for (let i = 0; i < rows[0].length; i++) {
-            column = [];
-            for (let j = 0; j < rows.length; j++) {
-                if (rows[j][i] !== "NULL")
-                    column.push(rows[j][i])
+        if (rows.length) {
+            for (let i = 0; i < rows[0].length; i++) {
+                column = [];
+                for (let j = 0; j < rows.length; j++) {
+                    if (rows[j][i] !== "NULL")
+                        column.push(rows[j][i])
+                }
+    
+                column = column.map(value => isNaN(value));
+    
+                if (column.indexOf(true) === -1 && column.length > 0)
+                    types.push("numerical")
+                else if (column.length === 0)
+                    types.push("NULL")
+                else
+                    types.push("text");
             }
-
-            column = column.map(value => isNaN(value));
-
-            if (column.indexOf(true) === -1 && column.length > 0)
-                types.push("numerical")
-            else if (column.length === 0)
-                types.push("NULL")
-            else
-                types.push("text");
         }
 
         return types
@@ -1185,18 +1195,22 @@ class Database {
 
         var p;
         if (arr1.length === 0 || arr2.length === 0)
-            return 0 // Lowest p-value possible => worst result (want the best match)
+            /* Lowest p-value possible => worst result (want the best match) 
+             * Likley won't occur, since seed set requires >= 1 row. */
+            return 0
 
         if (arr1.length === 1 && arr2.length === 1)
+            /* Map between 0.01 and 0.99 to avoid log(0) */
             p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
 
         else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
-            p = 0.98 * (Number(arr1[0] === arr2[0])) + 0.01 // Map between 0.01 and 0.99 to avoid log(0)
+            p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01 
 
-        /* If only one row in seedSet's numerical col, use one-sample t-test */
         else if (arr1.length === 1)
+            /* If only one row in seedSet's numerical col, use one-sample t-test */
             p = Number(ttest(arr2, { mu: arr1[0] }).pValue())
         else
+            /* Run Welch's t-test */
             p = Number(ttest(arr1, arr2).pValue())
 
         return p
@@ -1204,7 +1218,7 @@ class Database {
 
     makeStrArr(str) {
         /* Since the SQL arguments need to be an array, 
-        * if the argument passed to a method is a string (i.e. only one keyword)
+         * if the argument passed to a method is a string (i.e. only one keyword)
          * then we must convert it to an array of one string in order for the 
          * SQL engine to accept it. 
          * 
@@ -1213,8 +1227,7 @@ class Database {
          * 
          * Returns:
          * - array, which is either the 'str' argument unchanged if already array
-         *      or an array of one element
-         */
+         *      or an array of one element */
         if (typeof str !== 'object') {
             str = [str]
         }
