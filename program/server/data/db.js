@@ -1006,12 +1006,21 @@ class Database {
                         res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)))
                     })
                 })
-                
 
                 /* Sum each 2-D array to give a final numerical
                  * score for each row */
+                var row, total;
                 results.forEach(res => {
-                    res['score'] = Math.sqrt(res['score'].reduce((num, arr) => arr.reduce((n1, n2) => n1 + n2, 0) * num, 1))
+                    total = Infinity
+                    row = 1
+                    for (let j = 0; j < res['score'][0].length; j++) {
+                        for (let i = 0; i < res['score'].length; i++) {
+                            row *= res['score'][i][j]
+                        }
+                        total = Math.min(total, row)
+                        row = 1;
+                    }
+                    res['score'] = Math.sqrt(total);
                 })
 
 

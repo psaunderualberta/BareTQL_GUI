@@ -135,6 +135,12 @@ export default {
       var submitButtons = document.querySelectorAll(".Operations");
       changeButtons(submitButtons, "Loading Results...");
 
+      if (this.sliderValues.every(val => val == "0")) {
+        changeButtons(submitButtons, "At least 1 slider value must be larger than 0.\n Please try again.")
+        this.expandedRows = { rows: [], info: [] }
+        return
+      }
+
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols, this.rowsReturned)
         .then(data => {
           changeButtons(submitButtons, this.functions[0]['message']);
@@ -221,7 +227,7 @@ export default {
       if (typeof stickyValue === "undefined") {
         return 50;
       }
-      return stickyValue;
+      return Number(stickyValue);
     },
 
     incorrectRowsReturned() {
