@@ -992,7 +992,8 @@ class Database {
                 var engine = bm25();                
                 
                 for (let col=0; col<this.seedSet['numCols'];col++) {
-                    /* Reset search engine */
+                    /* Define search engine parameters
+                     * for current iteration */
                     engine.defineConfig({
                         fldWeights: { value: 1 },
                         bm25Params: { 
@@ -1002,7 +1003,10 @@ class Database {
                         }
                     });
                     engine.definePrepTasks(pipe);        
+                    keywords = cols[col].map(val => ngrams(2, val)).flat().join(' ')
 
+                    /* Add row[col] to the search engine for all rows
+                     * in all tables */
                     for (let table of tables) {
                         for (let [i, row] of table['rows'].entries()) {
     
@@ -1011,15 +1015,17 @@ class Database {
                         }
                     }
 
+                    /* Consolidate and run search */
                     engine.consolidate()
-                    keywords = cols[col].map(val => ngrams(2, val)).flat().join(' ')
                     var results = engine.search(keywords, numRows)
 
+                    /* Update scores for each row */
                     results.forEach(result => {
                         var key = result[0]
                         scores[key]['score'] += result[1] * this.seedSet['sliders'][col] / 100
                     })
 
+                    /* Reset engine for next iteration */
                     engine.reset()
                 }
 
