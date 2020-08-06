@@ -108,10 +108,9 @@ export default {
       expandedRows: { rows: [], info: [] },
       table: {rows: []},
       sliderValues: [],
-      rowsReturned: 10,
+      rowsReturned: 30, /* Default for user */
       uniqueCols: [],
       deletions: [],
-      bootUp: true,
       numCols: 0,
       dotOp: "",
     };
@@ -144,7 +143,6 @@ export default {
       ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols, this.rowsReturned)
         .then(data => {
           changeButtons(submitButtons, this.functions[0]['message']);
-          this.bootUp = false;
           this.expandedRows = this.handleResponse(data);
         })
         .catch(err => {

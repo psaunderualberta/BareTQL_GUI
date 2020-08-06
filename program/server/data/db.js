@@ -3,10 +3,12 @@
  * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md */
 
 const sqlite3 = require('better-sqlite3');
-const leven = require('leven');
+const ngrams = require('talisman/tokenizers/ngrams')
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
+const bm25 = require('wink-bm25-text-search')
+const nlp = require('wink-nlp-utils')
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -950,82 +952,82 @@ class Database {
          * Returns:
          * - Promise which resolves if ranking is successful, rejects otherwise */
 
-        var rows = this.seedSet['rows'].map(row => row.split(' || '))
-        var results = [];
-        var tableRow;
-        var scores;
+        var cols = this.seedSet['rows'].map(row => row.split(' || '))
+        var scores = {}
+        var keywords;
+        var doc;
+
+        /* Transposing 2D array in JS
+         * https://stackoverflow.com/questions/17428587/transposing-a-2d-array-in-javascript
+         * Accessed August 5th, 2020 */
+        var numRows = tables.reduce((num, table) => num + table['rows'].length, 0)
+
+        function adjustK1(val) {
+            return 0.008 * val + 1.2
+        }
+        
+        cols = cols[0].map((x,i) => cols.map(x => x[i]))
+
+        var key;
+        for (let table of tables) {
+            scores[table['table_id']] = {}
+            for (let i=0; i<table['rows'].length;i++) {
+                table['rows'][i] = table['rows'][i].split(' || ')
+                key = `${table['table_id']}-${i}`
+                scores[key] = {}
+                scores[key]['row'] = table['rows'][i]
+                scores[key]['title'] = table['titles'][i]
+                scores[key]['score'] = 0
+            }
+        }
 
         return new Promise((resolve, reject) => {
             try {
-                for (let table of tables) {
-                    for (let i = 0; i < table['rows'].length; i++) {
-                        tableRow = table['rows'][i];
-                        tableRow = tableRow.split(' || ')
 
-                        /* For a particular row to be scored, scores[o][p] represents the 
-                         * similarty score with the values at column 'o' and row 'p' of the seed set 
-                         * and column 'o' of the particular row. */
-                        scores = this.createColArr()
+                const pipe = [
+                    nlp.string.lowerCase,
+                    nlp.string.tokenize0,
+                ];
 
-                        for (let j = 0; j < rows.length; j++) {
-                            for (let k = 0; k < rows[j].length; k++) {
-                                if (!isNaN(rows[j][k]) && !isNaN(tableRow[k]))
-                                    scores[k].push(Math.abs(Number(rows[j][k] === "NULL" ? tableRow[k] : rows[j][k]) - Number(tableRow[k])))
-                                else
-                                    scores[k].push(leven(rows[j][k], tableRow[k]))
-                            }
+                var engine = bm25();                
+                
+                for (let col=0; col<this.seedSet['numCols'];col++) {
+                    /* Reset search engine */
+                    engine.defineConfig({
+                        fldWeights: { value: 1 },
+                        bm25Params: { 
+                            k1: adjustK1(this.seedSet['sliders'][col]), 
+                            b: 0.85, 
+                            k: 1
                         }
+                    });
+                    engine.definePrepTasks(pipe);        
 
-                        results.push({
-                            row: tableRow,
-                            title: table['titles'][i],
-                            score: scores,
-                        })
+                    for (let table of tables) {
+                        for (let [i, row] of table['rows'].entries()) {
+    
+                            doc = {value: ngrams(2, row[col]).join(' ')}
+                            engine.addDoc(doc, `${table['table_id']}-${i}`)
+                        }
                     }
+
+                    engine.consolidate()
+                    keywords = cols[col].map(val => ngrams(2, val)).flat().join(' ')
+                    var results = engine.search(keywords, numRows)
+
+                    results.forEach(result => {
+                        var key = result[0]
+                        scores[key]['score'] += result[1] * this.seedSet['sliders'][col] / 100
+                    })
+
+                    engine.reset()
                 }
 
-                var maxes = this.createColArr()
+                results = Object.values(scores).filter(obj => Object.keys(obj).length)
 
-                results.forEach(res => {
-                    maxes.forEach((col, i) => {
-                        col.push(...res['score'][i])
-                    })
-                })
-
-                /* Get max of each column, across all rows measured */
-                maxes = maxes.map(arr => arr.reduce((a, b) => Math.max(a, b), 0))
-
-                /* For each row, divide each column score for that 
-                 * row by the maximum similarity score for that column
-                 * across ALL rows scored. That is, normalize each array of scores (one for each column)
-                 * to be between 0 and 1 (1 being the maximum measured score for that column), 
-                 * then multiply each score by the slider value.
-                 * This ensures that each column is equally weighted before the sliders are applied */
-                maxes.forEach((max, i) => {
-                    results.forEach(res => {
-                        res['score'][i] = res['score'][i].map(val => (val * this.seedSet['sliders'][i] / (!max ? 1 : max)))
-                    })
-                })
-
-                /* Sum each 2-D array to give a final numerical
-                 * score for each row */
-                var row, total;
-                results.forEach(res => {
-                    total = Infinity
-                    row = 1
-                    for (let j = 0; j < res['score'][0].length; j++) {
-                        for (let i = 0; i < res['score'].length; i++) {
-                            row *= res['score'][i][j]
-                        }
-                        total = Math.min(total, row)
-                        row = 1;
-                    }
-                    res['score'] = Math.sqrt(total);
-                })
-
-
-                /* Sort the rows in ascending order according to score */
-                results = results.sort((res1, res2) => { return res1['score'] - res2['score'] });
+                
+                /* Sort the rows in descending order according to score */
+                results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
                 var tmp = { rows: [], info: [] }
 
                 /* RegExp for inserting commas into a number
@@ -1037,7 +1039,7 @@ class Database {
                     })
 
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Total Distance: ${res['score']}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['score']).toFixed(5)}`)
                 })
 
                 results = tmp;
