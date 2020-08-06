@@ -997,7 +997,7 @@ class Database {
                         fldWeights: { value: 1 },
                         bm25Params: { 
                             k1: adjustK1(this.seedSet['sliders'][col]), 
-                            b: 0.4, 
+                            b: 0.85, 
                             k: 1
                         }
                     });
@@ -1007,7 +1007,6 @@ class Database {
                         for (let [i, row] of table['rows'].entries()) {
     
                             doc = {value: ngrams(2, row[col]).join(' ')}
-                            // console.log(doc)
                             engine.addDoc(doc, `${table['table_id']}-${i}`)
                         }
                     }
@@ -1027,7 +1026,7 @@ class Database {
                 results = Object.values(scores).filter(obj => Object.keys(obj).length)
 
                 
-                /* Sort the rows in ascending order according to score */
+                /* Sort the rows in descending order according to score */
                 results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
                 var tmp = { rows: [], info: [] }
 
@@ -1040,7 +1039,7 @@ class Database {
                     })
 
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Total Distance: ${res['score']}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['score']).toFixed(5)}`)
                 })
 
                 results = tmp;
