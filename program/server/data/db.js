@@ -4,6 +4,7 @@
 
 const sqlite3 = require('better-sqlite3');
 const jaccard = require('talisman/metrics/jaccard')
+const {lig1, lig2} = require('talisman/metrics/lig');
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
@@ -406,8 +407,11 @@ class Database {
                  * (even if they haven't changed) */
                 this.rowsReturned = rowsReturned
 
-                for (let i = 0; i < sliderValues.length; i++) {
-                    this.seedSet['sliders'][i] = Number(sliderValues[i])
+                if (sliderValues.length) {
+                    sliderValues = this.makeStrArr(sliderValues)
+                    for (let i = 0; i < sliderValues.length; i++) {
+                        this.seedSet['sliders'][i] = Number(sliderValues[i])
+                    }
                 }
 
                 this.seedSet['uniqueCols'] = []
@@ -953,8 +957,6 @@ class Database {
 
         var cols = this.seedSet['rows'].map(row => row.split(' || '))
         var scores = {}
-        var keywords;
-        var doc;
 
         /* Transposing 2D array in JS
          * https://stackoverflow.com/questions/17428587/transposing-a-2d-array-in-javascript
@@ -965,16 +967,12 @@ class Database {
             return 0.01 * val
         }
 
-        function score(val) {
-
-        }
-        
-        cols = cols[0].map((x,i) => cols.map(x => x[i]))
+        cols = cols[0].map((x, i) => cols.map(x => x[i]))
 
         var key;
         for (let table of tables) {
             scores[table['table_id']] = {}
-            for (let i=0; i<table['rows'].length;i++) {
+            for (let i = 0; i < table['rows'].length; i++) {
                 table['rows'][i] = table['rows'][i].split(' || ')
                 key = `${table['table_id']}-${i}`
                 scores[key] = {}
@@ -986,21 +984,22 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                var engine = new bs25(jaccard);                
-                
-                for (let col=0; col<this.seedSet['numCols'];col++) {
+                // var engine = new bs25(jaccard);          
+                var engine = new bs25(lig2);
+                // var engine = new bs25(lig3);
+
+                for (let col = 0; col < this.seedSet['numCols']; col++) {
                     /* Reset search engine */
                     engine.defineConfig({
                         terms: cols[col],
-                        bs25Params: { 
-                            k1: adjustK1(this.seedSet['sliders'][col]), 
-                            b: 0.3, 
+                        bs25Params: {
+                            k1: adjustK1(this.seedSet['sliders'][col]),
+                            b: 0.3,
                         }
                     });
 
                     for (let table of tables) {
                         for (let [i, row] of table['rows'].entries()) {
-    
                             engine.addDoc(row[col], `${table['table_id']}-${i}`)
                         }
                     }
@@ -1020,7 +1019,6 @@ class Database {
 
                 var tmp = { rows: [], info: [] }
 
-                                
                 /* Sort the rows in descending order according to score */
                 results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
 
@@ -1059,7 +1057,7 @@ class Database {
         var uniqueSets = [];
         var stickySets = [];
         var uniqueRows = { rows: [], info: [] };
-        var stickyCols = this.seedSet['sliders'].reduce((arr, cur, i) => {if (cur === 100) arr.push(i); return arr}, [])
+        var stickyCols = this.seedSet['sliders'].reduce((arr, cur, i) => { if (cur === 100) arr.push(i); return arr }, [])
         var rrIndex = 0;
 
         for (const _ of this.seedSet['uniqueCols']) uniqueSets.push(new Set())
@@ -1083,18 +1081,18 @@ class Database {
             /* No values in rankedRows['rows'][rrIndex] are in the uniqueCols' sets,
                 * every value in rankedRows['rows'][rrIndex] are in the stickyCols' sets */
             else if (this.seedSet['uniqueCols']
-                        .map((col, i) => uniqueSets[i].has(rankedRows['rows'][rrIndex][col]))
-                        .every(inSet => !inSet)
-                    && stickyCols
-                        .map((col, i) => stickySets[i].has(rankedRows['rows'][rrIndex][col]))
-                        .every(inSet => inSet)) {
+                .map((col, i) => uniqueSets[i].has(rankedRows['rows'][rrIndex][col]))
+                .every(inSet => !inSet)
+                && stickyCols
+                    .map((col, i) => stickySets[i].has(rankedRows['rows'][rrIndex][col]))
+                    .every(inSet => inSet)) {
                 for (let [i, el] of this.seedSet['uniqueCols'].entries())
                     uniqueSets[i].add(rankedRows['rows'][rrIndex][el])
 
                 uniqueRows['rows'].push(rankedRows['rows'][rrIndex].join(' || '))
                 uniqueRows['info'].push(rankedRows['info'][rrIndex++])
-            } 
-            
+            }
+
             /* A unique constraint is broken if we show the row to the user */
             else
                 rrIndex++;
@@ -1173,9 +1171,9 @@ class Database {
                     if (rows[j][i] !== "NULL")
                         column.push(rows[j][i])
                 }
-    
+
                 column = column.map(value => isNaN(value));
-    
+
                 if (column.indexOf(true) === -1 && column.length > 0)
                     types.push("numerical")
                 else if (column.length === 0)
@@ -1209,7 +1207,7 @@ class Database {
             p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
 
         else if (statistics.standardDeviation(arr1) === 0 && statistics.standardDeviation(arr2) === 0)
-            p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01 
+            p = 0.98 * Number(arr1[0] === arr2[0]) + 0.01
 
         else if (arr1.length === 1)
             /* If only one row in seedSet's numerical col, use one-sample t-test */

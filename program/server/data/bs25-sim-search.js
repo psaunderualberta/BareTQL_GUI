@@ -19,7 +19,7 @@ class BS25 {
 
     /* # of documents */
     this.numDocs = 0
-    /* actual documents */
+    /* actual documents, consisting of an identifier and the document itself */
     this.documents = {}
 
     /* vars to ensure correct sequence of function calls is followed */

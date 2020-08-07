@@ -158,6 +158,7 @@ export default {
           this.table = this.handleResponse(data);
           document.querySelectorAll('.deleteTags').forEach(tag => {tag.classList.remove('clicked')})
           this.deletions = [];
+          this.expandedRows = { rows: [], info: [] }
         })
         .catch(err => {
           console.log(err);
