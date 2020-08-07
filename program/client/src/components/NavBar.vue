@@ -27,7 +27,7 @@ export default {
   name: "NavBar",
   methods: {
     changeButtons(become_disabled) {
-      document.querySelectorAll('input, button:not(#exit-help), a').forEach(inp => {
+      document.querySelectorAll('input, label, button:not(#exit-help), a, #activator').forEach(inp => {
         inp.disabled = become_disabled;
         inp.style.cursor = become_disabled ? "auto" : "pointer";
       })
