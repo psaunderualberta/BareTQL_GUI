@@ -168,7 +168,7 @@ class Converter():
             if not any([
                 cType != 'text',  # Not textual
                 "" in column, # >= 1 cell that is empty
-                len(set(column)) < len(column) * 0.9, # Not unique (for our purposes)
+                len(set(column)) < len(column) * 0.5, # Not unique (for our purposes)
                 tablesScript.is_increment(list(column)),  # Incremental
                 not self.minPunctCol(column), # Contains < minimum # allowed punctuation
                 not self.minPunctIntCol(column), # Contains < minimum # allows punc & numbers

@@ -4,7 +4,7 @@
 
 const sqlite3 = require('better-sqlite3');
 const jaccard = require('talisman/metrics/jaccard')
-const {lig1, lig2} = require('talisman/metrics/lig');
+const leven = require('leven')
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
@@ -979,14 +979,15 @@ class Database {
                 scores[key]['row'] = table['rows'][i]
                 scores[key]['title'] = table['titles'][i]
                 scores[key]['score'] = 0
+                scores[key]['rank'] = 0
             }
         }
 
         return new Promise((resolve, reject) => {
             try {
                 // var engine = new bs25(jaccard);          
-                var engine = new bs25(lig2);
-                // var engine = new bs25(lig3);
+                var normLeven = (a, b) => (Math.max(a.length, b.length) - leven(a, b)) / Math.max(a.length, b.length)
+                var engine = new bs25(normLeven)
 
                 for (let col = 0; col < this.seedSet['numCols']; col++) {
                     /* Reset search engine */
@@ -994,22 +995,28 @@ class Database {
                         terms: cols[col],
                         bs25Params: {
                             k1: adjustK1(this.seedSet['sliders'][col]),
-                            b: 0.3,
+                            b: 0.6,
                         }
                     });
 
                     for (let table of tables) {
                         for (let [i, row] of table['rows'].entries()) {
-                            engine.addDoc(row[col], `${table['table_id']}-${i}`)
+                            if (row[col] === 'NULL')
+                                engine.addDoc('', `${table['table_id']}-${i}`)
+                            else
+                                engine.addDoc(row[col], `${table['table_id']}-${i}`)
+
                         }
                     }
 
                     engine.consolidate()
                     var results = engine.query(numRows)
 
-                    results.forEach(result => {
-                        var key = result[0]
-                        scores[key]['score'] += result[1] // * this.seedSet['sliders'][col] / 100
+                    results.forEach((result, i) => { 
+                        result[0].forEach(id => {
+                            scores[id]['rank'] += i / this.seedSet['numCols']* this.seedSet['sliders'][col]
+                            scores[id]['score'] += result[1] * this.seedSet['sliders'][col]
+                        })
                     })
 
                     engine.reset()
@@ -1021,17 +1028,18 @@ class Database {
 
                 /* Sort the rows in descending order according to score */
                 results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
+                // console.log(results.slice(0, 10))
 
                 /* RegExp for inserting commas into a number
                  * http://stackoverflow.com/questions/721304/ddg#721415
                  * Accessed July 20th 2020 */
                 results.forEach(res => {
-                    res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
-                        return match + ','
-                    })
-
+                    // res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
+                    //     return match + ','
+                    // })
+                    
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['score']).toFixed(5)}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['rank']).toFixed(5)}`)
                 })
 
                 results = tmp;

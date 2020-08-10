@@ -84,15 +84,18 @@ class BS25 {
     }
     
     /* Set new document, calculate similarity scores */
-    this.documents[id] = {'sims': [], 'len': 0}
-    var simValue = 0
-    for (let i = 0; i < this.terms.length; i++) {
-      simValue = this.simFunc(doc, this.terms[i])
-      this.documents[id]['sims'].push(simValue)
-      this.documents[id]['len'] = doc.length
-      this.documents[id]['word'] = doc
-      this.avgSims[i] += simValue
+    if (!this.documents[doc]) {
+      this.documents[doc] = {'ids': [], 'sims': [], 'len': 0}
+      var simValue = 0
+      for (let i = 0; i < this.terms.length; i++) {
+        simValue = this.simFunc(doc, this.terms[i])
+        this.documents[doc]['sims'].push(simValue)
+        this.avgSims[i] += simValue
+      }
+      this.documents[doc]['len'] = doc.length
     }
+    
+    this.documents[doc]['ids'].push(id)
 
     /* Increment counters */
     this.avgLen += doc.length
@@ -149,7 +152,7 @@ class BS25 {
         denom = (sim + this.k1 * (1 - this.b + this.b * this.documents[key]['len'] / this.avgLen))
         sum += num / denom
       }
-      results.push([key, sum, this.documents[key]['word']])
+      results.push([this.documents[key]['ids'], sum, key])
     }
 
     /* Sort the results in descending order */
