@@ -70,15 +70,14 @@
           </tr>
         </tbody>
       </div>
-      <br>
+
+      <div class="centering info">
+        <p>'***': This column has been tagged as unique.</p>
+      </div>
+      <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
+      
       <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
       <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="fixed">
-        <template #between-table-downloads>
-          <div class="centering info">
-            <p>'***': This column has been tagged as unique.</p>
-          </div>
-          <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-        </template>
       </UserTable>
       
     </div>

@@ -1014,7 +1014,7 @@ class Database {
 
                     results.forEach((result, i) => { 
                         result[0].forEach(id => {
-                            scores[id]['rank'] += i / this.seedSet['numCols']* this.seedSet['sliders'][col]
+                            scores[id]['rank'] += i / this.seedSet['numCols'] * this.seedSet['sliders'][col]
                             scores[id]['score'] += result[1] * this.seedSet['sliders'][col]
                         })
                     })
@@ -1082,6 +1082,7 @@ class Database {
 
             /* This row is in the expanded rows, or has a NULL value */
             if (uniqueRows['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
+                || this.seedSet['rows'].indexOf(rankedRows['rows'][rrIndex].join(' || ').trim()) !== -1
                 || rankedRows['rows'][rrIndex].indexOf('NULL') > 0)
                 rrIndex++;
 
