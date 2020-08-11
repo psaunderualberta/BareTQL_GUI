@@ -11,13 +11,13 @@
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
         <div class="container">
-          <p>Select unique columns: <br class="extra-br-spacing">
-            <span 
+          <p>Select unique columns:</p>
+            <div
               @click="colTagClick($event, uniqueCols)" 
               class="col-checkboxes uniqueTags" 
               v-for="col in numCols" :key="col"
-              >{{ col }}.</span>
-          </p>
+              >{{ col }}.</div>
+          
         </div>
 
         <div class="container">
@@ -29,13 +29,13 @@
 
         <!-- Deletion checkboxes  -->
         <div class="container">
-          <p>Select columns to delete: <br class="extra-br-spacing">
-            <span 
+          <p>Select columns to delete:</p>
+            <div
               @click="colTagClick($event, deletions)" 
               class="col-checkboxes deleteTags" 
               v-for="col in numCols" :key="col"
-              >{{ col }}.</span>
-          </p>
+              >{{ col }}.</div>
+          
           <div class="container" v-if="deletions.length > 0">
             <div style="height: 3px"></div>
             <button
@@ -53,8 +53,8 @@
           <tr>
             <td v-for="col in numCols" :key="col">
               <div>
-                <p style="text-align: left; position: absolute;">
-                  <span style="">{{ col }}.</span>
+                <p style="text-align: left;">
+                  <span>{{ col }}.</span>
                   <span v-if="uniqueCols.indexOf(col) !== -1">***</span>
                 </p>
                 <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
@@ -290,12 +290,15 @@ input[type="range"] {
   padding: 2%;
   margin-bottom: 0.5%;
   display: inline-block;
+  vertical-align: middle;
 }
 
 .col-checkboxes {
-  padding: 0 2%;
-  margin: 2%;
+  display: inline-block;
   cursor: pointer;
+  padding: 0 5px;
+  height: 22px;
+  margin: 2%;
 }
 
 .extra-br-spacing {
