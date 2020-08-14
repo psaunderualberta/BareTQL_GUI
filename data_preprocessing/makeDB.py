@@ -68,7 +68,7 @@ def main():
         line = line.strip()
         if len(line) == 0:
             continue
-
+ 
         if re.match(r"^title", line):
             if (table_num + 1) % 10 == 0:
                 sys.stderr.write('\r{0} tables added into the database'.format(table_num + 1))

@@ -3,7 +3,6 @@
  * https://github.com/JoshuaWise/better-sqlite3/blob/master/docs/api.md */
 
 const sqlite3 = require('better-sqlite3');
-const jaccard = require('talisman/metrics/jaccard')
 const leven = require('leven')
 const ttest = require('ttest');
 const statistics = require('simple-statistics')
@@ -28,7 +27,7 @@ class Database {
                 readonly: true,
             })
         } catch (error) {
-            console.log(`Something went wrong with dbPath: ${dbPath}: ${error}`);
+            console.log(`Something went wrong with dbPath (${dbPath}): ${error}`);
             return
         }
 
@@ -978,16 +977,24 @@ class Database {
                 scores[key] = {}
                 scores[key]['row'] = table['rows'][i]
                 scores[key]['title'] = table['titles'][i]
-                scores[key]['score'] = 0
-                scores[key]['rank'] = 0
+                scores[key]['score'] = table['score']
+                scores[key]['ranks'] = []
             }
         }
 
         return new Promise((resolve, reject) => {
             try {
-                // var engine = new bs25(jaccard);          
-                var normLeven = (a, b) => (Math.max(a.length, b.length) - leven(a, b)) / Math.max(a.length, b.length)
-                var engine = new bs25(normLeven)
+                var normData = (a, b) => {
+                    if (!isNaN(a) && !isNaN(b)) {
+                        a = Math.abs(a) /* Automatically converts to number */
+                        b = Math.abs(b)
+                        return (Math.min(a, b) + 10e-5) / (Math.max(a, b) + 10e-5)
+                    } else {
+                        return 1 - leven(a, b) / Math.max(a.length, b.length)
+                    }
+                }
+
+                var engine = new bs25(normData)
 
                 for (let col = 0; col < this.seedSet['numCols']; col++) {
                     /* Reset search engine */
@@ -995,7 +1002,7 @@ class Database {
                         terms: cols[col],
                         bs25Params: {
                             k1: adjustK1(this.seedSet['sliders'][col]),
-                            b: 0.6,
+                            b: 0.3,
                         }
                     });
 
@@ -1012,11 +1019,13 @@ class Database {
                     engine.consolidate()
                     var results = engine.query(numRows)
 
+                    var numAfter = results.reduce((prev, cur) => prev + cur[0].length, 0)
                     results.forEach((result, i) => { 
                         result[0].forEach(id => {
-                            scores[id]['rank'] += i / this.seedSet['numCols'] * this.seedSet['sliders'][col]
-                            scores[id]['score'] += result[1] * this.seedSet['sliders'][col]
+                            scores[id]['ranks'].push(numAfter)
+                            // scores[id]['score'] += result[1] * this.seedSet['sliders'][col]
                         })
+                        numAfter -= result[0].length
                     })
 
                     engine.reset()
@@ -1024,11 +1033,16 @@ class Database {
 
                 results = Object.values(scores).filter(obj => Object.keys(obj).length)
 
+                results = results.map(score => {
+                    console.log(score['score'])
+                    score['score'] += score['ranks'].reduce((prev, cur) => prev + cur, 0) / this.seedSet['numCols']
+                    return score
+                })
                 var tmp = { rows: [], info: [] }
+
 
                 /* Sort the rows in descending order according to score */
                 results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
-                // console.log(results.slice(0, 10))
 
                 /* RegExp for inserting commas into a number
                  * http://stackoverflow.com/questions/721304/ddg#721415
@@ -1039,7 +1053,8 @@ class Database {
                     // })
                     
                     tmp['rows'].push(res['row']);
-                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['rank']).toFixed(5)}`)
+                    tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['score']).toFixed(5)}`)
+                    // tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${res['score']}`)
                 })
 
                 results = tmp;
