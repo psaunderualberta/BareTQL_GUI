@@ -968,6 +968,8 @@ class Database {
 
         cols = cols[0].map((x, i) => cols.map(x => x[i]))
 
+        var numRows = 0
+
         var key;
         for (let table of tables) {
             scores[table['table_id']] = {}
@@ -977,8 +979,9 @@ class Database {
                 scores[key] = {}
                 scores[key]['row'] = table['rows'][i]
                 scores[key]['title'] = table['titles'][i]
-                scores[key]['score'] = table['score']
+                scores[key]['score'] = 0
                 scores[key]['ranks'] = []
+                numRows++
             }
         }
 
@@ -995,8 +998,14 @@ class Database {
                 }
 
                 var engine = new bs25(normData)
+                var numNonZeroCols = 0
 
                 for (let col = 0; col < this.seedSet['numCols']; col++) {
+                    if (this.seedSet['sliders'][col] === 0)
+                        continue
+                    
+                    numNonZeroCols++;
+
                     /* Reset search engine */
                     engine.defineConfig({
                         terms: cols[col],
@@ -1022,8 +1031,7 @@ class Database {
                     var numAfter = results.reduce((prev, cur) => prev + cur[0].length, 0)
                     results.forEach((result, i) => { 
                         result[0].forEach(id => {
-                            scores[id]['ranks'].push(numAfter)
-                            // scores[id]['score'] += result[1] * this.seedSet['sliders'][col]
+                            scores[id]['ranks'].push(numAfter / numRows)
                         })
                         numAfter -= result[0].length
                     })
@@ -1033,9 +1041,9 @@ class Database {
 
                 results = Object.values(scores).filter(obj => Object.keys(obj).length)
 
+                /* Use the average ranking across the row as the score */
                 results = results.map(score => {
-                    console.log(score['score'])
-                    score['score'] += score['ranks'].reduce((prev, cur) => prev + cur, 0) / this.seedSet['numCols']
+                    score['score'] += score['ranks'].reduce((prev, cur) => prev + cur, 0) / numNonZeroCols
                     return score
                 })
                 var tmp = { rows: [], info: [] }
@@ -1044,17 +1052,9 @@ class Database {
                 /* Sort the rows in descending order according to score */
                 results = results.sort((res1, res2) => { return res2['score'] - res1['score'] });
 
-                /* RegExp for inserting commas into a number
-                 * http://stackoverflow.com/questions/721304/ddg#721415
-                 * Accessed July 20th 2020 */
                 results.forEach(res => {
-                    // res['score'] = String(res['score']).replace(new RegExp(`(?<!\\.[^.]*)(\\d)(?=(\\d{3})+(?:$|\\.))`, 'gi'), match => {
-                    //     return match + ','
-                    // })
-                    
                     tmp['rows'].push(res['row']);
                     tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${+parseFloat(res['score']).toFixed(5)}`)
-                    // tmp['info'].push(`Title: List of ${res['title'].trim()}<br>Similarity Score: ${res['score']}`)
                 })
 
                 results = tmp;
