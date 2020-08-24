@@ -66,8 +66,8 @@ class Database {
          * Accessed June 23 2020 */
         this.db.function('T_TEST', { deterministic: true }, (arr1, arr2) => {
 
-            arr1 = JSON.parse(arr1).map(num => Number(num))
-            arr2 = JSON.parse(arr2).map(num => Number(num))
+            arr1 = JSON.parse(arr1).map(num => Number(num)).filter(num => !isNaN(num))
+            arr2 = JSON.parse(arr2).map(num => Number(num)).filter(num => !isNaN(num))
 
             return this.ttestCases(arr1, arr2)
         })
@@ -566,7 +566,7 @@ class Database {
                         AND c.value != ''
                         GROUP BY table_id, col_id
                         HAVING MAX(OVERLAP_SIM(?, toArr(value)), T_TEST(?, toArr(value))) >= ?
-        
+                        
                         INTERSECT
                     `
                     params.push(...[this.seedSet['numNumerical'], numCol, numCol, numSlider / 100])
@@ -793,7 +793,7 @@ class Database {
                     /* Iterate over all permutations of the columns, 
                     * finding the one that returns the highest chi^2 test statistic
                     * by using Fisher's method */
-                    if (this.seedSet['numNumerical'] && cols['colIDs'].length < Math.max(this.seedSet['numCols'], 14)) {
+                    if (this.seedSet['numNumerical'] && cols['colIDs'].length <= Math.max(this.seedSet['numCols'], 14)) {
                         combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
                             curChiTestStat = 0;
 
@@ -1003,7 +1003,7 @@ class Database {
                 for (let col = 0; col < this.seedSet['numCols']; col++) {
                     if (this.seedSet['sliders'][col] === 0)
                         continue
-                    
+
                     numNonZeroCols++;
 
                     /* Reset search engine */
@@ -1029,7 +1029,7 @@ class Database {
                     var results = engine.query(numRows)
 
                     var numAfter = results.reduce((prev, cur) => prev + cur[0].length, 0)
-                    results.forEach((result, i) => { 
+                    results.forEach((result, i) => {
                         result[0].forEach(id => {
                             scores[id]['ranks'].push(numAfter / numRows)
                         })
