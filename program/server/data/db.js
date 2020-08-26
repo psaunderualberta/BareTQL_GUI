@@ -987,9 +987,11 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
+                /* Custom similarity function to work with both textual
+                 * & numerical values */
                 var normData = (a, b) => {
                     if (!isNaN(a) && !isNaN(b)) {
-                        a = Math.abs(a) /* Automatically converts to number */
+                        a = Math.abs(a) /* Automatically converts to Number */
                         b = Math.abs(b)
                         return (Math.min(a, b) + 10e-5) / (Math.max(a, b) + 10e-5)
                     } else {
@@ -1028,6 +1030,7 @@ class Database {
                     engine.consolidate()
                     var results = engine.query(numRows)
 
+                    /* Borda's method for rank aggregation */
                     var numAfter = results.reduce((prev, cur) => prev + cur[0].length, 0)
                     results.forEach((result, i) => {
                         result[0].forEach(id => {

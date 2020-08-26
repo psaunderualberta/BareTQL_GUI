@@ -35,7 +35,7 @@
               class="col-checkboxes deleteTags" 
               v-for="col in numCols" :key="col"
               >{{ col }}.</div>
-          
+          <br>
           <div class="container" v-if="deletions.length > 0">
             <div style="height: 3px"></div>
             <button
