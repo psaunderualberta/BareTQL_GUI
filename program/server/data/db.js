@@ -8,6 +8,8 @@ const ttest = require('ttest');
 const statistics = require('simple-statistics')
 const combinatorics = require('js-combinatorics')
 const bs25 = require('./bs25-sim-search')
+const solver = require('javascript-lp-solver');
+const { Integer } = require('better-sqlite3');
 
 /* SCHEMA 
  * cells(table_id, row_id, col_id, value)
@@ -670,37 +672,25 @@ class Database {
                         })
                     }
 
-                    bestPerm = {
+                    var bestPerm = {
                         table_id: result['table_id'],
                         textualPerm: [],
                         textScore: 0,
                     };
-                    /* If the key column in the seed set has a successful mapping,
-                    * Iterate over all permutations of the columns, 
-                    * finding the one that returns the lowest cumulative overlap similarity */
 
-                    if (this.seedSet['numTextual']) {
-                        combinatorics.permutation(cols['colIDs'], this.seedSet['numTextual']).forEach(perm => {
-                            curCumProbs = [];
+                    var result = this.lpSolve(pValDP, "numTextual", cols['colIDs']);
 
-                            for (let i = 0; i < ssCols.length; i++) {
-                                curCumProbs.push(pValDP[i][perm[i]])
-                            }
-
-                            pass = curCumProbs.every((val, i) => val >= sliderIndices[i] / 100)
-                            curCumProbs = curCumProbs.reduce((a, b) => a + b, 0)
-
-                            if (pass && curCumProbs > bestPerm['textScore']) {
-                                bestPerm['textualPerm'] = perm;
-                                bestPerm['textScore'] = curCumProbs
-                            }
-                        })
-                    }
-
-                    if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)
-                        tables[i] = bestPerm
-                    else
+                    if (result["feasible"]) {
+                        bestPerm["textualPerm"] = result["mapping"]
+                        bestPerm["textScore"] = result["score"]
+                        if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0) {
+                            tables[i] = bestPerm
+                        } else {
+                            tables.splice(i--, 1)
+                        }
+                    } else {
                         tables.splice(i--, 1)
+                    }
                 }
 
                 resolve(tables)
@@ -728,10 +718,9 @@ class Database {
         var sliderIndices = [];
         var column = [];
         var ssCols = [];
-        var table;
         var pValDP = [];
         var cols = [];
-        var curChiTestStat;
+        var table;
         var stmt;
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
@@ -785,39 +774,19 @@ class Database {
                         })
                     }
 
-                    table['numericalPerm'] = [];
-                    table['chiTestStat'] = Infinity;
+                    var result = this.lpSolve(pValDP, "numNumerical", cols['colIDs']);
 
-                    curChiTestStat = 0;
-
-                    /* Iterate over all permutations of the columns, 
-                    * finding the one that returns the highest chi^2 test statistic
-                    * by using Fisher's method */
-                    if (this.seedSet['numNumerical'] && cols['colIDs'].length <= Math.max(this.seedSet['numCols'], 14)) {
-                        combinatorics.permutation(cols['colIDs'], this.seedSet['numNumerical']).forEach(idPerm => {
-                            curChiTestStat = 0;
-
-                            for (let i = 0; i < ssCols.length; i++) {
-                                curChiTestStat += pValDP[i][idPerm[i]]
-                            }
-
-                            curChiTestStat *= -2;
-
-                            if (curChiTestStat < table['chiTestStat']) {
-
-                                table['numericalPerm'] = idPerm;
-                                table['chiTestStat'] = curChiTestStat
-                            }
-                        })
-                    }
-                    if (this.seedSet['numNumerical'] && table['numericalPerm'].length === 0)
+                    // Decipher results of the LP solve
+                    if (result["feasible"]) {
+                        if (this.seedSet['numNumerical']) {
+                            table["numericalPerm"] = result["mapping"]
+                            table["score"] = -2 * result["score"] + table['textScore']
+                        } else {
+                            table['score'] = table['textScore']
+                        }
+                    } else {
                         tables.splice(i--, 1)
-
-                    /* Set a 'base score' for the table to be used when ranking rows */
-                    else if (this.seedSet['numNumerical'])
-                        table['score'] = table['chiTestStat'] + table['textScore']
-                    else
-                        table['score'] = table['textScore']
+                    }
                 }
 
                 resolve(tables);
@@ -1244,6 +1213,88 @@ class Database {
             p = Number(ttest(arr1, arr2).pValue())
 
         return p
+    }
+
+    lpSolve(scores, colType, colIDs) {
+
+        /* Produce constraints for the linear programming.
+         * Maximum number of columns: the number of seed set columns of that type
+         * Only one of each seed set can be mapped to.
+         * Each potential column can only be mapped to one seed set column.
+         * ** We are looking to create a bijection
+         */ 
+        var constraints;
+        if (colType === "numNumerical") {
+            constraints = {"columns": {"min": this.seedSet[colType]}}
+        } else {
+            constraints = {"columns": {"max": this.seedSet[colType]}}
+        }
+        for (var i = 0; i <= this.seedSet[colType]; i++) {
+            constraints[`ss${i}`] = {"max": 1}
+        }
+        colIDs.forEach(id => {
+            constraints[`cid${id}`] = {"max": 1};
+        })
+
+        /* Establish the variables to use with the dynamic programming
+         * Each variable has the column count (always 1), its score, 
+         * and a one-hot encoding identifying the seed set variable and potential column
+         * which correspond to its score.
+         */
+        var variables = {}, mapping;
+        colIDs.forEach((id, index) => {
+            for (var i = 0; i < this.seedSet[colType]; i++) {
+                mapping = `${id}-${i}`
+
+                variables[mapping] = {
+                    "columns": 1, 
+                    "score": scores[i][index],
+                }
+
+                // Cannot put templates into object initialization
+                variables[mapping][`ss${i}`] = 1
+                variables[mapping][`cid${id}`] = 1
+            }
+        })
+
+        // Build model
+        var model = {
+            "optimize": "score",
+            "opType": "max",
+            "constraints": constraints,
+            "variables": variables,
+        }
+        
+        // Solve model
+        var result = solver.Solve(model);
+
+        // Initialize result to be returned
+        var returned = {
+            "feasible": result["feasible"], 
+            "score": result["result"],
+            mapping: []
+        }
+        for (var i = 0; i < this.seedSet[colType]; i++) {
+            returned["mapping"].push(null);
+        }
+
+        // Map the columns into a list of indices
+        var map;
+        if (result["feasible"]) {
+            Object.keys(result).forEach(key => {
+                if (key.indexOf('-') >= 0) {
+                    map = key.split('-').map(num => Number(num));
+                    returned["mapping"][map[1]] = map[0]
+                }
+            })
+        }
+
+        // If some columns were not mapped, ignore the result
+        if (returned["mapping"].some(num => num === null)) {
+            returned["feasible"] = false;
+        }
+    
+        return returned
     }
 
     makeStrArr(str) {

@@ -22,6 +22,7 @@
     "concurrently": "^5.2.0",
     "cors": "^2.8.5",
     "express": "^4.17.1",
+    "javascript-lp-solver": "^0.4.24",
     "js-combinatorics": "^0.6.1",
     "leven": "^3.1.0",
     "simple-statistics": "^7.1.0",
