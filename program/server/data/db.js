@@ -462,8 +462,11 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
+                var start = new Date();
                 this.getMatchingTables()
-                    .then((results) => {
+                .then((results) => {
+                        var end = new Date();
+                        console.log(`getMatchingTables: ${(end - start) / 1000}s`)
                         return this.getTextualMatches(results)
                     }).then((results) => {
                         return this.getNumericalMatches(results)
@@ -535,20 +538,20 @@ class Database {
                 if (textCol.length - 2) {
                     stmt += `
                         SELECT table_id, title
-                        FROM columns NATURAL JOIN titles NATURAL JOIN (
+                        FROM cells NATURAL JOIN columns NATURAL JOIN titles NATURAL JOIN (
                             SELECT table_id
-                            FROM cells NATURAL JOIN columns
+                            FROM columns
                             WHERE type = 'text'
-                            GROUP BY table_id, col_id
-                            HAVING OVERLAP_SIM(?, toArr(value)) >= ?
+                            GROUP BY table_id
+                            HAVING COUNT(DISTINCT col_id) >= ?
                         )
                         WHERE type = 'text'
-                        GROUP BY table_id
-                        HAVING COUNT(DISTINCT col_id) >= ?
+                        GROUP BY table_id, col_id
+                        HAVING OVERLAP_SIM(?, toArr(value)) >= ?
         
                         INTERSECT
                     `
-                    params.push(...[textCol, textSlider / 100, this.seedSet['numTextual']])
+                    params.push(...[this.seedSet['numTextual'], textCol, textSlider / 100])
                 }
 
                 if (numCol.length - 2) {
@@ -782,6 +785,7 @@ class Database {
                             table["numericalPerm"] = result["mapping"]
                             table["score"] = -2 * result["score"] + table['textScore']
                         } else {
+                            table["numericalPerm"] = [];
                             table['score'] = table['textScore']
                         }
                     } else {
@@ -1361,8 +1365,7 @@ class Database {
     }
 
     overlapSim(arr1, arr2) {
-        var colSet = new Set(arr2);
-        return new Set(arr1.filter(value => colSet.has(value))).size / new Set(arr1).size
+        return arr1.filter(value => arr2.indexOf(value) >= 0).length / arr1.length
     }
 
     resetDPArr(dpArr, ssCols, potTableCols) {
