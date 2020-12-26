@@ -529,7 +529,7 @@ class Database {
         getFirstCol(this.seedSet, 'numerical', numSlider, numCol)
 
         textSlider = textSlider[0]; numSlider = numSlider[0];
-        textCol = JSON.stringify(textCol); numCol = JSON.stringify(numCol.map(num => Number(num)));
+        numCol = JSON.stringify(numCol.map(num => Number(num)));
 
         return new Promise((resolve, reject) => {
             try {
@@ -546,13 +546,16 @@ class Database {
                             HAVING COUNT(DISTINCT col_id) >= ?
                         )
                         WHERE type = 'text'
+                        AND value IN ${this.getQMarks(textCol)}
                         GROUP BY table_id, col_id
-                        HAVING OVERLAP_SIM(?, toArr(value)) >= ?
+                        HAVING COUNT(*) >= ?
         
                         INTERSECT
                     `
-                    params.push(...[this.seedSet['numTextual'], textCol, textSlider / 100])
+                    params.push(...[this.seedSet['numTextual'], ...textCol, textSlider / 100 * textCol.length])
                 }
+
+                console.log(stmt);
 
                 if (numCol.length - 2) {
                     stmt += `
@@ -1410,3 +1413,23 @@ class Database {
 }
 
 module.exports = Database;
+
+
+/**
+ *  SELECT table_id, title
+    FROM cells NATURAL JOIN columns NATURAL JOIN titles NATURAL JOIN (
+        SELECT table_id
+        FROM columns
+        WHERE type = 'text'
+        GROUP BY table_id
+        HAVING COUNT(DISTINCT col_id) >= ?
+    )
+    WHERE type = 'text'
+    AND value IN [...]
+    // GROUP BY table_id, col_id
+    // HAVING COUNT(*) >= ?
+
+
+
+    INTERSECT
+ */
