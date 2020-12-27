@@ -613,7 +613,7 @@ class Database {
                         colIDs: cols.map(res => res['col_id'])
                     }
 
-                    /* Re-initialize dynamic programming array */
+                    /* Re-initialize array used to log the values */
                     this.resetDPArr(pValDP, sliderIndices.length, Math.max(...cols['colIDs']))
 
                     /* Fill DP array */
@@ -623,21 +623,14 @@ class Database {
                         })
                     }
 
-                    var bestPerm = {
-                        table_id: result['table_id'],
-                        textualPerm: [],
-                        textScore: 0,
-                    };
+                    /* Find the best mapping */
+                    var lpResult = this.lpSolve(pValDP, "numTextual", cols['colIDs']);
 
-                    var result = this.lpSolve(pValDP, "numTextual", cols['colIDs']);
-
-                    if (result["feasible"]) {
-                        bestPerm["textualPerm"] = result["mapping"]
-                        bestPerm["textScore"] = result["score"]
-                        if (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0) {
-                            tables[i] = bestPerm
-                        } else {
-                            tables.splice(i--, 1)
+                    if (lpResult["feasible"] && (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)) {
+                        tables[i] = {
+                            table_id: result["table_id"],
+                            textualPerm: lpResult["mapping"],
+                            textScore: lpResult["score"]
                         }
                     } else {
                         tables.splice(i--, 1)
@@ -721,6 +714,7 @@ class Database {
                             )
                         })
                     }
+
                     var result = this.lpSolve(pValDP, "numNumerical", cols['colIDs']);
 
                     // Decipher results of the LP solve
@@ -865,21 +859,21 @@ class Database {
     rankResults(tables) {
         var cols = this.seedSet['rows'].map(row => row.split(' || '))
         var scores = {}
+        var numRows = 0
+        var key;
+        
+        function adjustK1(val) {
+            return 0.01 * val
+        }
 
         /* Transposing 2D array in JS
          * https://stackoverflow.com/questions/17428587/transposing-a-2d-array-in-javascript
          * Accessed August 5th, 2020 */
         var numRows = tables.reduce((num, table) => num + table['rows'].length, 0)
 
-        function adjustK1(val) {
-            return 0.01 * val
-        }
-
         cols = cols[0].map((x, i) => cols.map(x => x[i]))
 
-        var numRows = 0
-
-        var key;
+        /* Define an object to contain the results of the row ranking */
         for (let table of tables) {
             scores[table['table_id']] = {}
             for (let i = 0; i < table['rows'].length; i++) {
