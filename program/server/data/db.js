@@ -22,7 +22,10 @@ const { Integer } = require('better-sqlite3');
 /* An instance of the Database class represents a database */
 class Database {
 
-    /* Constructor to initialize the database class */
+    /**
+     * Constructor to initialize the database class
+     * @param {String} dbPath the path to the database from the cwd
+     */
     constructor(dbPath) {
         try {
             this.db = new sqlite3(dbPath, {
@@ -74,16 +77,6 @@ class Database {
             return this.ttestCases(arr1, arr2)
         })
 
-        this.db.function('SEM', { deterministic: true }, (arr) => {
-            arr = JSON.parse(arr).map(num => Number(num))
-
-            if (arr.length === 0) { // Entire column is NULL, don't want in result
-                return Infinity
-            }
-
-            return statistics.standardDeviation(arr) / (Math.sqrt(arr.length)) // division by 0 won't happen
-        })
-
         this.db.function('OVERLAP_SIM', { deterministic: true }, (ssCol, keyCol) => {
             ssCol = JSON.parse(ssCol).map(v => String(v))
             keyCol = JSON.parse(keyCol)
@@ -92,21 +85,15 @@ class Database {
         })
     }
 
+    /**
+     * Queries the database for keywords found in cells, headers, 
+     * titles, and captions and returns the rows that matched,
+     * @param {String} keywords the stringified array of keywords to search for.
+     * @return {Promise} Promise containing the result of the keyword search.
+     */
     keywordSearch(keywords) {
-        /* This object queries the database for keywords found in cells, headers, 
-            titles, and captions and returns the rows that matched
-    
-            Arguments: 
-            - keyword: The keyword to be searched.
-            - params: Optional parameters
-    
-            Returns:
-            - Promise
-        */
         var results = [];
-
         keywords = this.makeStrArr(keywords)
-
         var keywordQMarks = this.getQMarks(keywords);
 
         /* Nested query is due to same keyword appearing in multiple
@@ -146,8 +133,9 @@ class Database {
             ) c
             
             ON r.table_id = c.table_id;
-
         `)
+
+        /* Return the promise containing the result of the query */
         return new Promise((resolve, reject) => {
             this.all(
                 stmt,
@@ -163,21 +151,13 @@ class Database {
         })
     }
 
+    /**
+     * Sets the current seed set to be referenced later upon set expansion.
+     * @param {String} tableIDs Stringified list of tableIDs of the seed set rows
+     * @param {String} rowIDs Stringified list of rowIDs of the seed set rows
+     * @return {Promise} Promise which resolves when the seed set is successfully set.
+     */
     postSeedSet(tableIDs, rowIDs) {
-        /* This method 'posts' the seed set to the database.
-         * In reality, we store the seed set as an attribute of the db instance,
-         * so that the seed set does not persist. We use the term 'post' in order to
-         * clarify that we are giving information to the instance, although it is not the 
-         * same as a POST http request.
-         * 
-         * Arguments:
-         * - tableIDs: the list of tableIDs. 
-         * - rowIDs: the list of rowIDs, organized to correspond 1-1 with tableIDs based on index.
-         * - sliderValues: the values of the sliders used to determine 'stickiness', based on the user's input
-         * 
-         * Returns:
-         * - Promise: resolves with nothing, rejects with error.
-         */
         var customTable = [];
         rowIDs = this.makeStrArr(rowIDs)
         tableIDs = this.makeStrArr(tableIDs)
@@ -233,14 +213,14 @@ class Database {
         })
     }
 
+    /**
+     * Performs the steps to clean the rows of the seed set,
+     * including finding the number of cols, filling Null values, 
+     * grouping columns, and getting the types of the columns
+     * @param {Boolean} changeSeed Flag if the seed set has been changed
+     * @param {Boolean} grouping Flag if the columns should be grouped / rearranged
+     */
     cleanRows(changeSeed, grouping) {
-        /* Performs the steps to clean the rows of the seed set,
-         * including finding the number of cols, filling Null values, 
-         * grouping columns, and getting the types of the columns
-         * 
-         * Returns: 
-         * - None, as it does the operations in-place */
-
         if (changeSeed)
             this.seedSet['numCols'] = this.seedSet['rows'].map(row => row.split(' || ').length).reduce((a, b) => Math.max(a, b), 0)
 
@@ -261,25 +241,20 @@ class Database {
         this.seedSet['numNULL'] = this.seedSet['types'].filter(type => type === 'NULL').length
     }
 
+    /**
+     * Attempts to group columns based on similar datatypes
+     * The datatypes we are considering are: 'null', 'numerical',
+     * and 'text' if neither of these two options are satisfied.
+     * This is designed to be a general grouping measure, as 
+     * we provide the user with the option to manually rearrange cells themselves.
+     * Cells are only swapped across columns; they are not swapped between rows.
+     * 
+     * We are grouping the columns thusly: 
+     * [PRIMARY KEY (unchanged), ...text, ...numerical, ...empty cells]
+     * 
+     * @param {Array} rows An array of stringified rows to be grouped by column type.
+     */
     groupCols(rows) {
-        /* Attempts to group columns based on similar datatypes
-         * The datatypes we are considering are: 'null', 'numerical',
-         * and 'text' if neither of these two options are satisfied.
-         * This is designed to be a general grouping measure, as 
-         * we provide the user with the option to manually rearrange cells themselves.
-         * Cells are only swapped across columns; they are not swapped between rows.
-         * 
-         * We are grouping the columns thusly: 
-         * [PRIMARY KEY (unchanged), ...text, ...numerical, ...empty cells]
-         * 
-         * Arguments:
-         * - rows: The array of rows, with cells separated with the phrase '||'
-         * 
-         * Returns:
-         * - the 'rows' argument with each row (possibly) rearranged according
-         *   to the description above.
-         */
-
         var curRow;
 
         for (let i = 0; i < rows.length; i++) {
@@ -309,18 +284,14 @@ class Database {
         }
     }
 
+    /**
+     * Swaps the two cells selected by the user, denoted
+     * by the positions of values in rowIDs, colIDs
+     * @param {Array} rowIDs The array of rowIDs to be swapped
+     * @param {Array} colIDs The array of column IDs to be swapped
+     * @return {Promise} The result of the swapped rows.
+     */
     swapCells(rowIDs, colIDs) {
-        /* Swaps the two cells selected by the user, denoted
-         * by the positions of values in rowIDs, colIDs
-         * 
-         * Arguments:
-         * - rowIDs: the row ids of the cells to be swapped in the seed set
-         * - colIDs: the column ids of the cells to be swapped, matching indices
-         *      with rowIDs
-         * 
-         * Returns:
-         * - Promise which resolves if cells were successfully swapped, rejection otherwise */
-
         return new Promise((resolve, reject) => {
             try {
                 var rows = this.seedSet['rows'].map(row => row.split(' || '))
@@ -342,15 +313,11 @@ class Database {
         })
     }
 
+    /**
+     * Deletes the specified columns from the user's table.
+     * @param {String} cols The stringified list of column ids to be deleted.
+     */
     deleteCols(cols) {
-        /* Deletes the specified columns from the user's table.
-         * 
-         * Arguments:
-         * - cols: The array of columns to delete
-         * 
-         * Returns:
-         * - Promise, resolving if successfully deleted columns, otherwise rejected.
-         */
         cols = this.makeStrArr(cols);
         var row;
         return new Promise((resolve, reject) => {
@@ -386,20 +353,17 @@ class Database {
         })
     }
 
+    /**
+     * Handles all dot operations, calling the correct functions to mutate the 
+     * seed set attribute. The first time this method is called, we are initializing 
+     * the operations page and so return the rows of the seed set without changing them.
+     * @param {String} dotOp The operation to perform
+     * @param {String} sliderValues The stringified list of slider values.
+     * @param {String} uniqueCols The stringified list of column ids which are set to be unique.
+     * @param {String} rowsReturned The number of rows to be returned to the user.
+     * @returns {Promise} A promise which resolves when the dot operation completes.
+     */
     handleDotOps(dotOp, sliderValues, uniqueCols, rowsReturned) {
-        /* Handles all dot operations, calling the correct functions to mutate the 
-         * seed set attribute. The first time this method is called, we are initializing 
-         * the operations page and so return the rows of the seed set without changing them.
-         * 
-         * Arguments:
-         * - dotOp: the operation to be performed on the seed set.
-         * 
-         * Returns:
-         * - Promise: resolves with new rows of seed set, rejects with error.
-         */
-
-        var seedCopy;
-
         return new Promise((resolve, reject) => {
             try {
 
@@ -431,7 +395,7 @@ class Database {
                         rej(`dotOp specified (${dotOp}) is not possible`)
                     }
                 }).then((results) => {
-                    seedCopy = { ...this.seedSet }
+                    var seedCopy = { ...this.seedSet }
 
                     if (typeof results['rows'] !== 'undefined') {
                         this.fillNulls(results['rows'], this.seedSet['numCols'])
@@ -450,16 +414,12 @@ class Database {
         })
     }
 
+    /**
+     * Delegates tasks related to the set expansion of
+     * seed set rows.
+     * @returns {Promise} Promise which resolves if successfully completed search, rejects otherwise
+     */
     xr() {
-        /* Delegates tasks related to the set expansion of
-         * seed set rows.
-         *
-         * Returns:
-         * - Promise which resolves if successfully completed search,
-         *      rejects otherwise
-         *
-         */
-
         return new Promise((resolve, reject) => {
             try {
                 this.getMatchingTables()
@@ -487,18 +447,15 @@ class Database {
         })
     }
 
+    /**
+     * Detects the tables which are likely to be related to the 
+     * seed set. This is done by evaluating the similarity between
+     * the LH-most textual column in the seed set and textual 
+     * columns in a table, and similarly for numerical columns. We then 
+     * take the intersection of the tables which matched textually and numerically
+     * @returns {Promise} Promise which resolves with tables if querying is successful, rejects otherwise.
+     */
     getMatchingTables() {
-        /* Detects the tables which are likely to be related to the 
-         * seed set. This is done by evaluating the similarity between
-         * the LH-most textual column in the seed set and textual 
-         * columns in a table, and similarly for numerical columns. We then 
-         * take the intersection of the tables which matched textually and numerically
-         * 
-         * Arguments:
-         * None
-         * 
-         * Returns:
-         * - Promise which resolves with tables if querying is successful, rejects otherwise. */
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var textSlider = [];
         var numSlider = [];
@@ -593,17 +550,15 @@ class Database {
         })
     }
 
+    /**
+     * Gets the 'best' textual permutation for all 
+     * tables found by getMatchingTables(), where 'best' 
+     * is determined by the largest cumulative overlap similarity
+     * for a permutation.
+     * @param {Array} tables The array of tables from the previous query
+     * @returns {Promise} Promise that resolves if querying is successful, rejects otherwise
+     */
     getTextualMatches(tables) {
-        /* Gets the 'best' textual permutation for all 
-         * tables found by getMatchingTables(), where 'best' 
-         * is determined by the largest cumulative overlap similarity
-         * for a permutation.
-         * 
-         * Arguments:
-         * - tables: The array of tables that satisfy the constraints of getMatchingTables()
-         * 
-         * Returns:
-         * - Promise that resolves if querying is successful, rejects otherwise */
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var ssCols = [];
@@ -611,8 +566,6 @@ class Database {
         var cols = [];
         var column;
         var stmt;
-
-
 
         for (let i = 0; i < this.seedSet['types'].length; i++) {
             if (this.seedSet['types'][i] !== 'text')
@@ -698,20 +651,18 @@ class Database {
         })
     }
 
+    /**
+     * For each table in the list of tables from 'getMatchingTables',
+     * we check all permutations of the table's numerical columns in order
+     * to see which permutation is the 'best'. A permutation is scored using "Fisher's 
+     * method" of combining p-values, where the p-value for each pair of columns
+     * is the maximum of overlap similarity and the p-value of Welch's t-test. These
+     * p-values are combined using Fisher's Method in order to produce a Chi-square test statistic,
+     * and the permutation with the highest test statistic is determined to be the best.
+     * @param {Array} tables The array of table objects from the previous query
+     * @returns {Promise} Promise which resolves if column mapping is successful, rejects otherwise
+     */
     getNumericalMatches(tables) {
-        /* For each table in the list of tables from 'getMatchingTables',
-         * we check all permutations of the table's numerical columns in order
-         * to see which permutation is the 'best'. A permutation is scored using "Fisher's 
-         * method" of combining p-values, where the p-value for each pair of columns
-         * is the maximum of overlap similarity and the p-value of Welch's t-test. These
-         * p-values are combined using Fisher's Method in order to produce a Chi-square test statistic,
-         * and the permutation with the highest test statistic is determined to be the best.
-         * 
-         * Arguments:
-         * - tables: The list of tables from getMatchingTables()
-         * 
-         * Returns:
-         * - Promise which resolves if column mapping is successful, rejects otherwise.*/
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
         var column = [];
@@ -793,17 +744,15 @@ class Database {
         })
     }
 
+    /**
+     * If there are 'n' columns in the seed set which are entirely filled with
+     * 'NULL', this function will find the first 'n' columns in ascending order which 
+     * are not already in the numericalPerm or textualPerm for the table. It will then add them
+     * to the table's 'NULLperm'.
+     * @param {Array} tables The list of table objects from getMatchingTables(), after textual and numerical column mapping
+     * @returns {Promise} Promise which resolves if querying is successful, rejects otherwise
+     */
     getNULLMatches(tables) {
-        /* If there are 'n' columns in the seed set which are entirely filled with
-         * 'NULL', this function will find the first 'n' columns in ascending order which 
-         * are not already in the numericalPerm or textualPerm for the table. It will then add them
-         * to the table's 'NULLperm'.
-         * 
-         * Arguments:
-         * - tables: The list of table objects from getMatchingTables(), after textual and numerical column mapping
-         * 
-         * Returns:
-         * - Promise which resolves if querying is successful, rejects otherwise */
         var indices;
         var stmt;
 
@@ -836,17 +785,14 @@ class Database {
         })
     }
 
+    /**
+     * Retrieves the rows of the tables found in the previous step,
+     * permuted to the 'best' possible permutations found in 
+     * getNumericalMatches() and getTextualMatches()
+     * @param {Array} tables The results of getNumericalMatches & getTextualMatches
+     * @returns {Promise} Promise which resolves if querying is successful, Rejects otherwise
+     */
     getPermutedRows(tables) {
-        /* Retrieves the rows of the tables found in the previous step,
-         * permuted to the 'best' possible permutations found in 
-         * getNumericalMatches() and getTextualMatches()
-         * 
-         * Arguments:
-         * - tables: The results of getNumericalMatches & getTextualMatches
-         * 
-         * Returns:
-         * - Promise which resolves if querying is successful, Rejects otherwise
-         */
         var cases;
         var stmt;
 
@@ -908,18 +854,15 @@ class Database {
         })
     }
 
+    /**
+     * Ranks the results that are gotten from getTextualMatches
+     * by comparing each potential row with each row in the seed set, giving
+     * that comparison a score, then averaging the scores across seed set rows
+     * returns the 10 best
+     * @param {Array} tables An array of rows from the tables that were identified to fit best with the data.
+     * @returns {Promise} Promise which resolves if ranking is successful, rejects otherwise.
+     */
     rankResults(tables) {
-        /* Ranks the results that are gotten from getTextualMatches
-         * by comparing each potential row with each row in the seed set, giving
-         * that comparison a score, then averaging the scores across seed set rows
-         * returns the 10 best
-         * 
-         * Arguments:
-         * - results: an array of rows from the tables that were identified to fit best with the data
-         * 
-         * Returns:
-         * - Promise which resolves if ranking is successful, rejects otherwise */
-
         var cols = this.seedSet['rows'].map(row => row.split(' || '))
         var scores = {}
 
@@ -1037,15 +980,13 @@ class Database {
         })
     }
 
+    /**
+     * Ensures that each column that the user tagged as 'unique' is actually unique,
+     * and each column with 100% stickiness has only the values in the seed set.
+     * @param {Array} rankedRows The rows that are sorted in ascending order according to their score.
+     * @returns {Array} The top 10 results (or less) that satisfy the user's unique
+     */
     applyColumnConstraints(rankedRows) {
-        /* Ensures that each column that the user tagged as 'unique' is actually unique,
-         * and each column with 100% stickiness has only the values in the seed set.
-         * 
-         * Arguments:
-         * - rankedRows: The rows that are sorted in ascending order according to their score
-         * 
-         * Returns: 
-         * - The top 10 results (or less) that satisfy the user's unique */
         var uniqueSets = [];
         var stickySets = [];
         var uniqueRows = { rows: [], info: [] };
@@ -1094,18 +1035,15 @@ class Database {
         return uniqueRows
     }
 
+    /**
+     * Custom definition of db.all used to work with
+     * our use of promises.
+     * @param {String} stmt A string containing the SQL query.
+     * @param {String} params A string containing the parameters of the SQL query
+     * @param {Array} results The array to which the results of the query will be pushed.
+     * @returns {Promise} A promise which resolves when our query completes and results are pushed to the results array.
+     */
     all(stmt, params, results) {
-        /* Custom definition of db.all used to work with
-         * our use of promises.
-         * 
-         * Arguments:
-         * - sql: A string containing the SQL query
-         * - params: An optional string containing the parameters of the SQL query
-         * - results: The array to which the results will be pushed
-         * 
-         * Returns:
-         * - Promise
-        */
         return new Promise((res, rej) => {
             try {
                 const rows = stmt.all(params)
@@ -1124,14 +1062,12 @@ class Database {
         })
     }
 
+    /**
+     * Pad each row in 'table' with NULL until the table is a rectangle.
+     * @param {Array} table A table containing rows which may need to be padded.
+     * @param {Number} numCols The number of columns to pad the table.
+     */
     fillNulls(table, numCols) {
-        /* Pad each row in 'table' with NULL until the table is a rectangle 
-         * 
-         * Arguments:
-         * - table: The table we want to pad with NULLs
-         * 
-         * Returns:
-         * - undefined, since we modify table in place*/
         var row;
         for (let i = 0; i < table.length; i++) {
             row = table[i].split(' || ')
@@ -1140,19 +1076,14 @@ class Database {
         }
     }
 
+    /**
+     * Gets the type of each column in 'table'. 
+     * If every cell is a number, it is labelled as 'number'
+     * Otherwise, it is of type 'text'
+     * @param {Array} table The table for which column types will be found
+     * @returns {Array} An array of datatypes with 1-1 correspondence to the table's columns.
+     */
     getTypes(table) {
-        /* Gets the type of each column in 'table'. 
-         * If every cell is a number, it is labelled as 'number'
-         * Otherwise, it is of type 'text'
-         * 
-         * Assumes table has at least one row
-         * 
-         * Arguments:
-         * - table: The table for which column types will be found
-         * 
-         * Returns:
-         * - An array of dtypes */
-
         var types = [];
         var column = [];
         var rows = table.map(row => row.split(' || '))
@@ -1179,17 +1110,16 @@ class Database {
         return types
     }
 
+    /**
+     * Handles the different cases of the t-test, 
+     * returning the p-value in each case 
+     * @param {Array} arr1 The first array, containing all numbers
+     * @param {Array} arr2 The second array, containing all numbers 
+     * @returns {Number} The p-value of the t-test
+     */
     ttestCases(arr1, arr2) {
-        /* Handles the different cases of the t-test, 
-         * returning the p-value in each case 
-         * 
-         * Arguments:
-         * - arr1, arr2: the two arrays to use the t-test with
-         * 
-         * Returns:
-         * - p-value of the t-test */
-
         var p;
+
         if (arr1.length === 0 || arr2.length === 0)
             /* Lowest p-value possible => worst result (want the best match) 
              * Likley won't occur, since seed set requires >= 1 row. */
@@ -1212,13 +1142,17 @@ class Database {
         return p
     }
 
+    /**
+     * Produce constraints for the linear programming.
+     * Maximum number of columns: the number of seed set columns of that type
+     * Only one of each seed set can be mapped to.
+     * Each potential column can only be mapped to one seed set column.
+     * @param {Array} scores A 2D array containing the relational values for the seed set.
+     * @param {String} colType The type of the columns being matched
+     * @param {Array} colIDs The column IDs of the columns being mapped to the seed set.
+     * @returns {Object} Contains the mapping of the columns, as well as a boolean 'feasible' if the mapping is sucessful.
+     */
     lpSolve(scores, colType, colIDs) {
-        /* Produce constraints for the linear programming.
-         * Maximum number of columns: the number of seed set columns of that type
-         * Only one of each seed set can be mapped to.
-         * Each potential column can only be mapped to one seed set column.
-         * ** We are looking to create a bijection
-         */ 
         var constraints;
         if (colType === "numNumerical") {
             constraints = {"columns": {"min": this.seedSet[colType]}}
@@ -1294,50 +1228,41 @@ class Database {
         return returned
     }
 
+    /**
+     * Since the SQL arguments need to be an array, 
+     * if the argument passed to a method is a string (i.e. only one keyword)
+     * then we must convert it to an array of one string in order for the 
+     * SQL engine to accept it. 
+     * @param {String | Array} str If the argument is a string, convert it to an array. Otherwise, leave it be.
+     * @returns {Array} Either the 'str' argument unchanged if already array or an array of one element
+     */
     makeStrArr(str) {
-        /* Since the SQL arguments need to be an array, 
-         * if the argument passed to a method is a string (i.e. only one keyword)
-         * then we must convert it to an array of one string in order for the 
-         * SQL engine to accept it. 
-         * 
-         * Arguments:
-         * - str: the data to be checked (type string or array)
-         * 
-         * Returns:
-         * - array, which is either the 'str' argument unchanged if already array
-         *      or an array of one element */
         if (typeof str !== 'object') {
             str = [str]
         }
         return str
     }
 
+    /**
+     * Creates the array for storing the similarity
+     * scores when ranking the rows to be returned to the user.
+     * Each sub-array represents one column of the seed set, and 
+     * contains the similarity scores of that column with the 
+     * value that is being compared.
+     * @returns {Array} 2D array with # of sub-arrays equal to # of columns in seed set
+     */
     createColArr() {
-        /* creates the array for storing the similarity
-         * scores when ranking the rows to be returned to the user.
-         * Each sub-array represents one column of the seed set, and 
-         * contains the similarity scores of that column with the 
-         * value that is being compared 
-         * 
-         * Arguments:
-         * None
-         * 
-         * Returns:
-         * - 2D array with # of sub-arrays equal to # of columns in seed set */
         return Array.apply(null, Array(this.seedSet['numCols'])).map(() => { return [] })
     }
 
+    /**
+     * Since the SQL engine uses '?' placeholders in order to format the query,
+     * this function determines the number of question marks based on the number
+     * of arguments passed to the query (arr).
+     * @param {Array} arr The array which is being passed to the query engine
+     * @returns {String} A string of the format "(?, ?, ..., ?)" with # of '?' equal to the length of 'arr'
+     */
     getQMarks(arr) {
-        /* Since the SQL engine uses '?' placeholders in order to format the query,
-        * this function determines the number of question marks based on the number
-        * of arguments passed to the query (arr).
-        * 
-        * Arguments:
-         * - arr: The array which will be passed to the query engine
-         * 
-         * Returns:
-         * - A string of the format "(?, ?, ..., ?)" with # of '?' equal to the length of 'arr'
-         */
         if (typeof arr === 'undefined') {
             return ''
         }
@@ -1357,23 +1282,27 @@ class Database {
         return qMarks
     }
 
+    /**
+     * Determines the 'overlap similarity' between the two arrays. To reduce the runtime
+     * of the function, we do not convert to sets. Also, we divide by the length of arr1, which is
+     * usually the seed set.
+     * The overlap similarity of two sets A, B is defined to be Intersect(A, B) / max(|A|, |B|)
+     * @param {Array} arr1 The first array.
+     * @param {Array} arr2 The second array.
+     * @returns {Number} The overlap similarity value, which is between 0 and 1.
+     */
     overlapSim(arr1, arr2) {
         return arr1.filter(value => arr2.indexOf(value) >= 0).length / arr1.length
     }
 
+    /**
+     * Resets the DP array used in finding both numerical mappings
+     * and textual mappings
+     * @param {Array} dpArr The array used to log the values
+     * @param {Number} ssCols The length of the # of seed set columns of the type we are analyzing.
+     * @param {Number} potTableCols The maximum column number of the table for which we are finding a mapping.
+     */
     resetDPArr(dpArr, ssCols, potTableCols) {
-        /* Resets the DP array used in finding both numerical mappings
-         * and textual mappings
-         * 
-         * Arguments:
-         * - dpArr: The array used to memoize the values
-         * - ssCols: The length of the # of seed set columns of the type we are
-         *      analyzing
-         * - potTableCols: The maximum column number of the table for which we are
-         *      finding a mapping
-         * 
-         * Returns:
-         * - undefined: All operations are performed dpArr in place. */
         for (let i = 0; i < ssCols; i++) {
             dpArr[i] = [];
             for (let j = 0; j <= potTableCols; j++) {
@@ -1382,21 +1311,22 @@ class Database {
         }
     }
 
+    /**
+     * Swaps the elements at indices i, j in 'arr'.
+     * @param {Array} arr The array in which to swap elements
+     * @param {Number} i The index of the first element to swap
+     * @param {Number} j The index of the second element to swap.
+     */
     swap(arr, i, j) {
-        /* Swaps the elements at indices i, j in arr
-         * 
-         * Arguments:
-         * - arr: The array in which to swap elements
-         * - i,j: The indices of the elements to be swapped
-         * 
-         */
         var tmp = arr[i]
         arr[i] = arr[j];
         arr[j] = tmp;
     }
 
+    /**
+     * Closes the database instance.
+     */
     close() {
-        /* Closes the database instance. */
         this.db.close();
         return
     }
