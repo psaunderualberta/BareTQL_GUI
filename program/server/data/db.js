@@ -462,27 +462,24 @@ class Database {
 
         return new Promise((resolve, reject) => {
             try {
-                var start = new Date();
                 this.getMatchingTables()
-                .then((results) => {
-                        var end = new Date();
-                        console.log(`getMatchingTables: ${(end - start) / 1000}s`)
-                        return this.getTextualMatches(results)
-                    }).then((results) => {
-                        return this.getNumericalMatches(results)
-                    }).then((results) => {
-                        return this.getNULLMatches(results)
-                    }).then((results) => {
-                        return this.getPermutedRows(results)
-                    }).then((results) => {
-                        return this.rankResults(results);
-                    }).then((results) => {
-                        resolve(results)
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                        resolve([])
-                    })
+                .then(results => {
+                    return this.getTextualMatches(results)
+                }).then(results => {
+                    return this.getNumericalMatches(results)
+                }).then(results => {
+                    return this.getNULLMatches(results)
+                }).then(results => {
+                    return this.getPermutedRows(results)
+                }).then(results => {
+                    return this.rankResults(results);
+                }).then(results => {
+                    resolve(results)
+                })
+                .catch((error) => {
+                    console.log(error);
+                    resolve([])
+                })
             } catch (error) {
                 console.log(error);
                 reject(error);
@@ -555,8 +552,6 @@ class Database {
                     params.push(...[this.seedSet['numTextual'], ...textCol, textSlider / 100 * textCol.length])
                 }
 
-                console.log(stmt);
-
                 if (numCol.length - 2) {
                     stmt += `
                         SELECT DISTINCT table_id, title
@@ -611,13 +606,10 @@ class Database {
          * - Promise that resolves if querying is successful, rejects otherwise */
         var rows = this.seedSet['rows'].map(row => row.split(' || '));
         var sliderIndices = [];
-        var curCumProbs = [];
         var ssCols = [];
         var pValDP = [];
         var cols = [];
-        var bestPerm;
         var column;
-        var pass;
         var stmt;
 
 
@@ -761,7 +753,6 @@ class Database {
                         `)
 
                     this.all(stmt, [table['table_id']], cols)
-
                     /* 'refine' result of query */
                     cols = {
                         columns: cols.map(res => JSON.parse(res['column']).map(num => Number(num))),
@@ -779,7 +770,6 @@ class Database {
                             )
                         })
                     }
-
                     var result = this.lpSolve(pValDP, "numNumerical", cols['colIDs']);
 
                     // Decipher results of the LP solve
@@ -1223,7 +1213,6 @@ class Database {
     }
 
     lpSolve(scores, colType, colIDs) {
-
         /* Produce constraints for the linear programming.
          * Maximum number of columns: the number of seed set columns of that type
          * Only one of each seed set can be mapped to.
@@ -1236,6 +1225,7 @@ class Database {
         } else {
             constraints = {"columns": {"max": this.seedSet[colType]}}
         }
+
         for (var i = 0; i <= this.seedSet[colType]; i++) {
             constraints[`ss${i}`] = {"max": 1}
         }
@@ -1243,22 +1233,22 @@ class Database {
             constraints[`cid${id}`] = {"max": 1};
         })
 
-        /* Establish the variables to use with the dynamic programming
+        /*
          * Each variable has the column count (always 1), its score, 
          * and a one-hot encoding identifying the seed set variable and potential column
          * which correspond to its score.
          */
         var variables = {}, mapping;
-        colIDs.forEach((id, index) => {
+        
+        colIDs.forEach(id => {
             for (var i = 0; i < this.seedSet[colType]; i++) {
                 mapping = `${id}-${i}`
 
                 variables[mapping] = {
                     "columns": 1, 
-                    "score": scores[i][index],
+                    "score": scores[i][id],
                 }
 
-                // Cannot put templates into object initialization
                 variables[mapping][`ss${i}`] = 1
                 variables[mapping][`cid${id}`] = 1
             }
@@ -1300,7 +1290,7 @@ class Database {
         if (returned["mapping"].some(num => num === null)) {
             returned["feasible"] = false;
         }
-    
+
         return returned
     }
 
@@ -1387,7 +1377,7 @@ class Database {
         for (let i = 0; i < ssCols; i++) {
             dpArr[i] = [];
             for (let j = 0; j <= potTableCols; j++) {
-                dpArr[i].push(-1)
+                dpArr[i].push(0)
             }
         }
     }
@@ -1413,23 +1403,3 @@ class Database {
 }
 
 module.exports = Database;
-
-
-/**
- *  SELECT table_id, title
-    FROM cells NATURAL JOIN columns NATURAL JOIN titles NATURAL JOIN (
-        SELECT table_id
-        FROM columns
-        WHERE type = 'text'
-        GROUP BY table_id
-        HAVING COUNT(DISTINCT col_id) >= ?
-    )
-    WHERE type = 'text'
-    AND value IN [...]
-    // GROUP BY table_id, col_id
-    // HAVING COUNT(*) >= ?
-
-
-
-    INTERSECT
- */
