@@ -626,7 +626,7 @@ class Database {
                     /* Find the best mapping */
                     var lpResult = this.lpSolve(pValDP, "numTextual", cols['colIDs']);
 
-                    if (lpResult["feasible"] && (!this.seedSet['numTextual'] || bestPerm['textualPerm'].length !== 0)) {
+                    if (lpResult["feasible"] && (!this.seedSet['numTextual'] || lpResult['mapping'].length !== 0)) {
                         tables[i] = {
                             table_id: result["table_id"],
                             textualPerm: lpResult["mapping"],
