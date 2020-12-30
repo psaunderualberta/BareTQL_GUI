@@ -22,8 +22,7 @@ def main():
                     continue
                 tableCount += 1
                 if tableCount % 10 == 0:
-                    sys.stderr.write(
-                        '\r' + str(tableCount) + " tables analyzed")
+                    sys.stderr.write('\r' + str(tableCount) + " tables analyzed")
                     sys.stderr.flush()
 
                 table = converter.Converter(filepath=os.path.join(subDir, filename))
