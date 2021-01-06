@@ -10,12 +10,71 @@ Once you have cloned the repository, there are a few steps that you need to foll
 1. Finally, cd to `../BareTQL_GUI/program`. If you have installed the npm package `nodemon` as described in the above optional step, run the command `npm start` to start up both the front-end and back-end for the app. The services for the front and back-end will run simultaneously using the npm package `concurrently`. If you see a large printout in the console that is just the `Vue.js` requirements being built. If you have not created a database, you will see the error `Something went wrong with dbPath: server/data/database.db: SqliteError: unable to open database file`. Instructions to construct the database are found on the final step. If you do not have `nodemon` installed, run `npm run start_once` to run the front-end and back-end. Note that if any changes are made to the back-end, you must stop and re-run the command to see the changes. For this reason, if you do not have `nodemon` installed I recommend doing the following instead of running `npm run start_once`:
      - OPTIONAL: If you do not have `nodemon` installed, I recommend starting the front and back-ends in different terminals as restarting Vue.js can take time, and so restarting the back-end only will be better for development. Cd to `../BareTQL_GUI/program/server/` and type `npm run once` to start the back-end, and remember to re-do this after every change to the back-end. Then open a new terminal, cd to `../BareTQL_GUI/program/client/` and type `npm run serve` to start the front-end. Vue.js automatically saves when it detects changes, so manual restarting of the server is only needed on the back-end.
 
-1. 
-
 
 ## Data Creation
-In order to use BareTQL, you will need a database designed for BareTQL. Currently, BareTQL includes python scripts which accept `.csv` or `.xlsx` files and converts their contents to a SQLite database usable by BareTQL. BareTQL uses the python library `Pandas` to assist with converting the data, and so ensure that the format of the files is acceptable to `Pandas`. If you are not familiar with pandas, then simply ensure that the data is organized into columns and has no more than one row discussing the column names.
-    - Move the files you wish to convert into the directory `../data_preprocessing/input`, and then run the file `../data.sh` with the cmd argument `make`. This will create the database in the directory `../program/server/data/database.db` using the files given. 
+In order to use BareTQL, you will need a database designed for BareTQL. 
+- Currently, BareTQL includes python scripts which accept `.csv` or `.xlsx` files and converts their contents to a SQLite database usable by BareTQL. BareTQL uses the python library `Pandas` to assist with converting the data, and so ensure that the format of the files is acceptable to `Pandas`. If you are not familiar with pandas, then simply ensure that the data is organized into columns and has no more than one row discussing the column names.
+    - If your data is already in multiple `.csv` or `.xlsx` files, then move the files you wish to convert into the directory `../data_preprocessing/input` (you'll have to create it), and then run the file `../data.sh` with the cmd argument `make`. This will create the database in the directory `../program/server/data/database.db` using the files given. 
+- If you do not have `.csv` files of the data, and they are stored in some other format, then you will need to either i) convert them to `.csv / .xlsx` and follow the above instructions, or ii) create your own database using the steps outlined below:
+    1. Ensure that SQLite3 is installed on your machine. 
+    1. Ensure that each table you wish to convert has a specific title, and that the table itself is rectangular in shape (all rows are of equal length). The table may also have a caption which provides a short description of the table. 
+        - NULL values in a table are fine, although they will be discussed later. 
+    1. In order for BareTQL to perform at its best, some preprocessing to your tables should be performed. Ideally, the number of NULL values in each column should be reduced as low as possible. If a given column cannot be reduced past a threshold of 50% NULL, it is our recommendation that the column be removed from the table for the purposes of BareTQL processing. Some other preprocessing steps may include:
+        - Removing dollar signs `$`, cent signs, or non-digit characters from numerical data (excluding '.').
+        - Removing extraneous rows.
+        - Removing cells which contain significant amounts of data (paragraphs of text, etc.).
+        - Ultimately, you'll want to remove as much extraneous data from as many rows as possible. The more condensed a cell's contents are, the faster BareTQL will be able to find relationships between it and other cells.
+    1. Give each table a specific i.d. number. This can be a unique random identification number or simply the index of the tables when iterating through them, but it must be unique. 
+    1. Run the following `SQLite` code in either a terminal or through a SQLite library for a language of your choice, for a file called `database.db`. This will create the necessary tables that BareTQL needs to run successfully:
+        - `CREATE TABLE cells(table_id integer, row_id integer, col_id integer, value text, location text, PRIMARY KEY (table_id, row_id, col_id));`
+        - `CREATE TABLE titles(table_id integer, title text, PRIMARY KEY (table_id));`
+        - `CREATE TABLE captions(table_id integer, caption text, PRIMARY KEY (table_id));`
+        - `CREATE TABLE columns(table_id integer, col_id integer, type varchar,  PRIMARY KEY (table_id, col_id));`
+        -  `CREATE TABLE keywords_cell_header(keyword varchar, table_id integer, row_id integer, col_id integer, location varchar, PRIMARY KEY (keyword, table_id, row_id, col_id));`
+        - `CREATE TABLE keywords_title_caption(table_id integer, location varchar, keyword varchar, PRIMARY KEY (table_id, location, keyword));`
+        - 
+        - *Note*: Although the data in the tables can be processed one row at-a-time, we strongly recommend processing all of the data beforehand so that a single insertion of the data into the database is made. This will drastically speed up your program, but is not necessary.
+    1. For each cell in each of the table, write the whole contents of the cell to the table `cells` with the following row structure:
+        - `<table_id>, <row_id>, <col_id>, <value>, <location>`
+        - `table_id` is the i.d. number of the table.
+        - `row_id` the 0-indexed position of the row when measured from the top of the table (the first row has row_id 0, second has row_id 1, and so on. ).
+        - `col_id` is the 0-indexed position of the cell when measured from the left (the first column has `col_id` 0, second has `col_id` 1, and so on.).
+        - `value` is the actual contents of the cell itself.
+        - `location` must be one of `cell` or `header`. This term is used to distinguish normal table cells from those which may further categorize the table (i.e. if the table is divided into sections). Rows which denote these sections should use the location `header`, while all other rows should use `cell`. 
+        - *IMPORTANT*: Empty cells MUST be written to the database in order for BareTQL to build the table from scratch again. To insert an empty cell, simply leave the `value` as an empty string. 
+    1. For all of the cells in all of your tables, split the cell into a list of 'keywords', recording the row i.d. and the column id of the original cell. These are typically all of the space-separated words, but may also be separated based on sentences, punctuation, or any other methodology. For each keyword, insert it into the table `keywords_cell_header` with the following format:
+        - `<keyword>, <table_id>, <row_id>, <col_id>, <location>`
+        - `keyword` is the keyword itself.
+        - `table_id` is the i.d. number of the table.
+        - `row_id` the 0-indexed position of the row when measured from the top of the table.
+        - `col_id` is the 0-indexed position of the cell when measured from the left. 
+        - `location` must be one of `cell` or `header`. This term is used to distinguish normal table cells from those which may further categorize the table (i.e. if the table is divided into sections). Rows which denote these sections should use the location `header`, while all other rows should use `cell`. 
+        - *NOTE*: Since NULL cells *by definition* don't have any content, they do not need to be written to this table.
+    1. For each title and caption for all tables, split the title / caption into a list of `keywords` using the same separating condition used for the cells above. For each keyword, insert it into the table `keywords_title_caption` with the following format:
+        - `<table_id>, <location>, <keyword>`
+        - *IMPORTANT*: Notice the different table structure from `keywords_cell_headers`. It is imperative that this structure is correct.
+        - `table_id` is the i.d. number of the table.
+        - `location` is one of `title` or `caption` which denotes the origin of the keyword.
+        - `keyword` is the keyword itself.
+    1. For each table, insert the whole title into the table `titles` with the following structure: 
+        - `<table_id>, <title>`
+        - `table_id` is the i.d. number of the table.
+        - `title` is the title of the table.
+        - Note that the whole title is written to the database, and so it should not be too long.
+    1. In a similar vein, for each table you may write the whole caption into the table `captions` with the following structure:  
+        - `<table_id>, <caption>`
+        - `table_id` is the i.d. number of the table.
+        - `caption` is the caption of the table.
+    1. Lastly, we must create the `columns` table. This is arguably the most important table as it allows BareTQL to efficiently map columns to other columns when expanding a seed set. A column can have one of two types: `numerical` or `text`. A numerical column is a column consisting entirely of numbers without any extra notation (a single decimal point is fine, but dollar or cent signs are not and should be removed if a column is to be labelled `numerical`). For each column in each table, it should be determined if said column satisfies the `numerical` property or should be regarded as `text`. Once this categorization has been decided, the following should be inserted into the `columns` table:
+        - `<table_id>, <col_id>, <type>`
+        - `table_id` is the id of the table which the column came from
+        - `col_id` is the 0-indexed i.d. of the column, as described above
+        - `type` MUST be one of either `numerical` or `text`. 
+    1. Finally, there is one more highly recommended, step to perform, though it is ultimately optional. As it stands, BareTQL must search through the entire database to find the rows and cells it deems most suitable to be returned to the user. This can take quite some time, and can be accelerated if the following SQLite code is run:
+        - `CREATE INDEX idx_kwch_kw ON keywords_cell_header(keyword);`
+        - `CREATE INDEX idx_kwtc_kw ON keywords_title_caption(keyword);`
+        - More indices can be created as required, but the above two indices are typically more than enough to speed up the program to an acceptable level.
+    1. Move the completed `database.db` file to the location `../program/server/data/database.db`, start the server as described above in the section `Installation Instructions`, and enjoy BareTQL!
 ## Data Storage and Querying
 - BareTQL uses the SQLite database management system to perform the queries necessary. Rather than directly mapping the tables given to BareTQL to sqlite, we translate the tables into a format which gives each table cell a number of additional attributes to accelerate the querying on the back-end. Operations performed inside the BareTQL GUI trigger API calls to the back-end, where SQLite queries are used to find the rows which most closely match the rows inside the seed set. 
 
@@ -28,6 +87,10 @@ In order to use BareTQL, you will need a database designed for BareTQL. Currentl
         - PRIMARY KEY (table_id)
     - columns(table_id integer, col_id integer, type varchar)
         - PRIMARY KEY (table_id, col_id)
+    - keywords_cell_header(keyword varchar, table_id integer, row_id integer, col_id integer, location varchar)
+        - PRIMARY KEY (keyword, table_id, row_id, col_id))
+    - keywords_title_caption(table_id integer, location varchar, keyword varchar)
+        - PRIMARY KEY (table_id, location, keyword)
     
 - This schema allows a table to be built on-the-fly, with custom rows and columns. Moreover, we ensure that the column type is preserved, with numerical columns being mapped to numerical columns, and textual columns mapped to textual columns. Most tables are rather self-explanatory, although there are a few additional criteria which speed up the querying. Each entry in the `cells` table includes its location (whether it is a normal cell or a header / sub-header in the table), which allows us to avoid costly joins when cross-referencing contents with the `titles` or `captions` table. Additionally, the `columns` table includes a `type` column, which assigns a column to be `numerical`, `textual`, or `NULL`. As stated above, this allows columns to be mapped only to columns with identical types and allows us to constrict the allowed mappings, accelerating the querying further. 
 
