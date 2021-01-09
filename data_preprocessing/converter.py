@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
-from baretql.program import UnitTagging
-from baretql.parsingScripts import tablesScript
+from util import tag_unit_for_column, is_increment
 import string
 import re
 import os
@@ -163,13 +162,13 @@ class Converter():
         """
         for columnName in self.df.columns:
             column = self.df[columnName]
-            cType = UnitTagging.tag_unit_for_column(column)
+            cType = tag_unit_for_column(column)
 
             if not any([
                 cType != 'text',  # Not textual
                 "" in column, # >= 1 cell that is empty
                 len(set(column)) < len(column) * 0.15, # Not unique (for our purposes)
-                tablesScript.is_increment(list(column)),  # Incremental
+                is_increment(list(column)),  # Incremental
                 not self.minPunctCol(column), # Contains < minimum # allowed punctuation
                 not self.minPunctIntCol(column), # Contains < minimum # allows punc & numbers
             ]):

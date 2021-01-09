@@ -1,6 +1,5 @@
 import os
 import sys
-import ijson
 import json
 import converter
 

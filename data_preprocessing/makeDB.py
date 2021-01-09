@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-import regex as re
+import re
 import ftfy
 import sys
 import os
@@ -64,57 +64,61 @@ def main():
     row_id = 0
     location = None
 
-    for line in sys.stdin:
-        line = line.strip()
-        if len(line) == 0:
-            continue
- 
-        if re.match(r"^title", line):
-            if (table_num + 1) % 10 == 0:
-                sys.stderr.write('\r{0} tables added into the database'.format(table_num + 1))
-                sys.stderr.flush()
-            headers = set()
-            location = 'title'
-            row_id = -1
-            table_num += 1
-            line = re.sub(r"^title:? ?", "", line)
-            handle_title(titles, table_num, line)
-            line = re.sub(r"^(?:List of )?", "", line)
-            title = line
-
-            # types always comes after title
-            line = re.sub(r"^types:? ?", "", sys.stdin.readline().strip())
-
-            line = re.sub(r"(?:int\d+|float\d+)", "numerical", line)
-            line = re.sub(r"object", "text", line)
-            handle_cols(columns, table_num, line.split(", "))
-            
-            line = title
-            
-        elif re.match(r"^caption", line):
-            location = 'caption'
-            row_id -= 1
-            line = re.sub(r"^caption:? *", "", line)
-            if len(line) > 0:
-                handle_caption(captions, table_num, line)
+    with open(os.path.join(filepath, "tmp", "output.txt")) as inp:
+        line = inp.readline()
+        while line:
+            line = line.strip()
+            if len(line) == 0:
+                continue
     
-        elif re.match(r"^header", line):
-            line = re.sub(r"^header:? ?", "", line)
-            headers.add(int(line))
-            continue
-    
-        else:
-            location = 'cell' if row_id not in headers else 'header'
-            line = line[1: -1].split('", "')
-            handle_cells(cells, table_num, row_id, line, location)
+            if re.match(r"^title", line):
+                if (table_num + 1) % 10 == 0:
+                    sys.stderr.write('\r{0} tables added into the database'.format(table_num + 1))
+                    sys.stderr.flush()
+                headers = set()
+                location = 'title'
+                row_id = -1
+                table_num += 1
+                line = re.sub(r"^title:? ?", "", line)
+                handle_title(titles, table_num, line)
+                line = re.sub(r"^(?:List of )?", "", line)
+                title = line
 
-        if type(line) == list:
-            line = list(map(str.lower, line))
-        else:
-            line = line.lower()
+                # types always comes after title
+                line = re.sub(r"^types:? ?", "", inp.readline().strip())
 
-        handle_keywords(kwCellHeader, kwTitleCaption, table_num, location, row_id, line)
-        row_id += 1
+                line = re.sub(r"(?:int\d+|float\d+)", "numerical", line)
+                line = re.sub(r"object", "text", line)
+                handle_cols(columns, table_num, line.split(", "))
+                
+                line = title
+                
+            elif re.match(r"^caption", line):
+                location = 'caption'
+                row_id -= 1
+                line = re.sub(r"^caption:? *", "", line)
+                if len(line) > 0:
+                    handle_caption(captions, table_num, line)
+        
+            elif re.match(r"^header", line):
+                line = re.sub(r"^header:? ?", "", line)
+                headers.add(int(line))
+                continue
+        
+            else:
+                location = 'cell' if row_id not in headers else 'header'
+                line = line[1: -1].split('", "')
+                handle_cells(cells, table_num, row_id, line, location)
+
+            if type(line) == list:
+                line = list(map(str.lower, line))
+            else:
+                line = line.lower()
+
+            handle_keywords(kwCellHeader, kwTitleCaption, table_num, location, row_id, line)
+            row_id += 1
+
+            line = inp.readline()
 
     # Perform insertions
     print("\nInserting into cells")
@@ -240,8 +244,6 @@ headers(tableId, colId, header)
 keywords_cell_header(keyword, tableId, rowId, colId,location)
 keywords_title_caption(table_id, location, keyword)
 """
-
-
 
 if __name__ == "__main__":
     main()
