@@ -197,12 +197,10 @@ class Database {
 
                     this.cleanRows(true, false);
 
-                    /* Set sliders to defaults */
+                    /* Set sliders to default value (50%) */
                     for (let i = 0; i < this.seedSet['rows'][0].split(this.cellSep).length; i++) {
                         this.seedSet['sliders'].push(50);
                     }
-
-
 
                     resolve()
                 })
@@ -390,7 +388,10 @@ class Database {
                     if (dotOp === 'undefined' || this.seedSet['rows'].every(row => row.length === 0)) {
                         res(this.seedSet['rows'].flat())
                     } else if (dotOp === 'xr') {
-                        this.xr().then((results) => { res(results) })
+                        this.xr()
+                        .then((results) => { 
+                            res(results) 
+                        })
                     } else {
                         rej(`dotOp specified (${dotOp}) is not possible`)
                     }
@@ -479,6 +480,9 @@ class Database {
             }
         }
 
+        /* Get the first textual & numerical columns, starting from RHS.
+         * These first columns are treated as the 'primary keys', in that related tables must 
+         * be measurably related to these columns */
         getFirstCol(this.seedSet, 'text', textSlider, textCol)
         getFirstCol(this.seedSet, 'numerical', numSlider, numCol)
 
@@ -623,9 +627,10 @@ class Database {
                         })
                     }
 
-                    /* Find the best mapping */
+                    /* Find the best mapping from the newfound table to the seed set */
                     var lpResult = this.lpSolve(pValDP, "numTextual", cols['colIDs']);
 
+                    // If a mapping is possible, record the mapping
                     if (lpResult["feasible"] && (!this.seedSet['numTextual'] || lpResult['mapping'].length !== 0)) {
                         tables[i] = {
                             table_id: result["table_id"],
@@ -633,6 +638,7 @@ class Database {
                             textScore: lpResult["score"]
                         }
                     } else {
+                        // Not possible to map columns, so remove this one.
                         tables.splice(i--, 1)
                     }
                 }
@@ -1148,12 +1154,16 @@ class Database {
      */
     lpSolve(scores, colType, colIDs) {
         var constraints;
+
+        /* Determine if we are optimizing to minimize or maximize, based on the type
+         * of columns being mapped */
         if (colType === "numNumerical") {
             constraints = {"columns": {"min": this.seedSet[colType]}}
         } else {
             constraints = {"columns": {"max": this.seedSet[colType]}}
         }
 
+        /* Record the necessary values (all others are set to 0) */
         for (var i = 0; i <= this.seedSet[colType]; i++) {
             constraints[`ss${i}`] = {"max": 1}
         }
