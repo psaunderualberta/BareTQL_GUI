@@ -99,40 +99,40 @@ class Database {
         /* Nested query is due to same keyword appearing in multiple
          * locations on same table, leading to repeated rows in output */
         const stmt = this.db.prepare(`
-            SELECT r.table_id, title, row_id, value, rowCount
-            FROM
-            (
-                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
-                FROM (
-                    SELECT DISTINCT table_id, row_id 
-                    FROM keywords_cell_header 
-                    WHERE keyword IN ${keywordQMarks}
-                ) k NATURAL JOIN titles t NATURAL JOIN cells c
+            WITH cellHeaderRows(table_id, row_id) AS (
+                SELECT DISTINCT table_id, row_id 
+                FROM keywords_cell_header 
+                WHERE keyword IN ${keywordQMarks}
+            ), titleCaptionRows(table_id) AS (
+                SELECT DISTINCT table_id 
+                FROM keywords_title_caption 
+                WHERE keyword IN ${keywordQMarks}
+            ), keywordRows AS (
+                SELECT k.table_id, c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
+                FROM cellHeaderRows k NATURAL JOIN cells c
                 WHERE c.location != 'header'
-                GROUP BY t.table_id, c.row_id
+                GROUP BY k.table_id, c.row_id
     
                 UNION
     
-                SELECT t.table_id, t.title , c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
-                FROM (
-                    SELECT DISTINCT table_id 
-                    FROM keywords_title_caption 
-                    WHERE keyword IN ${keywordQMarks}
-                ) k NATURAL JOIN titles t NATURAL JOIN cells c
-                GROUP BY t.table_id, c.row_id
+                SELECT k.table_id,  c.row_id, GROUP_CONCAT(c.value, ' || ') AS value
+                FROM titleCaptionRows k NATURAL JOIN cells c
+                GROUP BY k.table_id, c.row_id
     
-                ORDER BY t.table_id, c.row_id
-            ) r
-
-            LEFT JOIN 
-            
-            (
+                ORDER BY k.table_id, c.row_id
+            ), rowCounts(table_id, rowCount) AS (
                 SELECT table_id, COUNT(DISTINCT row_id) AS rowCount
                 FROM cells
                 GROUP BY table_id
-            ) c
-            
-            ON r.table_id = c.table_id;
+            ), rows(table_id, row_id, value, rowCount) AS (
+                SELECT r.table_id, row_id, value, rowCount
+                FROM keywordRows r
+                LEFT JOIN
+                rowCounts c
+                ON r.table_id = c.table_id
+            )
+            SELECT r.table_id, title, row_id, value, rowCount
+            FROM rows r NATURAL JOIN titles t;
         `)
 
         /* Return the promise containing the result of the query */
