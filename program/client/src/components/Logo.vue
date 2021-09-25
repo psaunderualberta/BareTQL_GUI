@@ -65,17 +65,16 @@
 
 
 <script>
-import NavBar from './NavBar.vue'
+import NavBar from "./NavBar.vue";
 
 export default {
-    name: 'logo',
-    components: {
-        NavBar,
-    },
-}
+  name: "logo",
+  components: {
+    NavBar,
+  },
+};
 </script>
 
 
 <style scoped>
-
 </style>

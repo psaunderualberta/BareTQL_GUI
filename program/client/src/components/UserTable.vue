@@ -8,20 +8,36 @@
     <!-- Allows the pop-ups with more information
          https://www.w3schools.com/css/css_tooltip.asp 
          Accessed July 20th 2020 -->
-    <div class="table" :id="'user-table-'+id" :style="'table-layout: '+tableLayout+';'">
-      <div class="table-row tooltip" v-for="(row, row_index) in table['rows']" :key="row_index">
-        <div class="table-cell" v-for="(cell, col_index) in row" :key="col_index">
+    <div
+      class="table"
+      :id="'user-table-' + id"
+      :style="'table-layout: ' + tableLayout + ';'"
+    >
+      <div
+        class="table-row tooltip"
+        v-for="(row, row_index) in table['rows']"
+        :key="row_index"
+      >
+        <div
+          class="table-cell"
+          v-for="(cell, col_index) in row"
+          :key="col_index"
+        >
           <div v-if="allowSelection">
             <input
               type="checkbox"
-              :id="row_index+'-'+col_index"
-              :value="row_index+'-'+col_index"
+              :id="row_index + '-' + col_index"
+              :value="row_index + '-' + col_index"
               v-model="selectedCells"
             />
-            <label :for="row_index+'-'+col_index">{{ cell }}</label>
+            <label :for="row_index + '-' + col_index">{{ cell }}</label>
           </div>
           <div v-else>{{ cell }}</div>
-          <span v-if="hoverEffect" v-html="table['info'][row_index]" class="tooltiptext"></span>
+          <span
+            v-if="hoverEffect"
+            v-html="table['info'][row_index]"
+            class="tooltiptext"
+          ></span>
         </div>
       </div>
     </div>
@@ -29,14 +45,12 @@
       <slot name="between-table-downloads"></slot>
     </div>
     <div v-if="downloadable && table['rows'].length > 0">
-      <button
-        @click="exportTableToCSV('BareTQL.csv', true)"
-        >Download Expanded rows
+      <button @click="exportTableToCSV('BareTQL.csv', true)">
+        Download Expanded rows
       </button>
-      <span style="margin: 0 5px;"></span>
-      <button
-        @click="exportTableToCSV('BareTQL.csv', false)"
-        >Download Seed Set &amp; Expanded Rows
+      <span style="margin: 0 5px"></span>
+      <button @click="exportTableToCSV('BareTQL.csv', false)">
+        Download Seed Set &amp; Expanded Rows
       </button>
     </div>
   </div>
@@ -63,7 +77,7 @@ export default {
     tableLayout: {
       type: String,
       required: false,
-      default: 'auto'
+      default: "auto",
     },
     hoverEffect: {
       type: Boolean,
@@ -142,8 +156,7 @@ export default {
         rows = document.querySelectorAll(
           `#user-table-${this.id.replace(".", "\\.")} div.table-row`
         );
-      else 
-        rows = document.querySelectorAll('div.table div.table-row');
+      else rows = document.querySelectorAll("div.table div.table-row");
 
       for (var i = 0; i < rows.length; i++) {
         var row = [],

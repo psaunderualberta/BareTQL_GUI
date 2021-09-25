@@ -6,7 +6,9 @@
         <slot name="logo" id="logo"></slot>
       </div>
       <div>
-        <span id="activator" @click="activate"><slot name="activator" ></slot></span>
+        <span id="activator" @click="activate"
+          ><slot name="activator"></slot
+        ></span>
       </div>
     </div>
     <div class="hidden-content">
@@ -16,7 +18,9 @@
       </div>
 
       <div class="centering">
-        <button id="exit-help" v-on:submit.prevent @click="deactivate">Exit Help</button>
+        <button id="exit-help" v-on:submit.prevent @click="deactivate">
+          Exit Help
+        </button>
       </div>
     </div>
   </div>
@@ -27,29 +31,32 @@ export default {
   name: "NavBar",
   methods: {
     changeButtons(become_disabled) {
-      document.querySelectorAll('input, label, button:not(#exit-help), a, #activator').forEach(inp => {
-        inp.disabled = become_disabled;
-        inp.style.cursor = become_disabled ? "auto" : "pointer";
-      })
+      document
+        .querySelectorAll("input, label, button:not(#exit-help), a, #activator")
+        .forEach((inp) => {
+          inp.disabled = become_disabled;
+          inp.style.cursor = become_disabled ? "auto" : "pointer";
+        });
     },
 
     activate() {
-      this.changeButtons(true)
-      document.querySelector('.hidden-content').classList.add('hidden-content-visible')
-      
+      this.changeButtons(true);
+      document
+        .querySelector(".hidden-content")
+        .classList.add("hidden-content-visible");
     },
 
     deactivate() {
-      this.changeButtons(false)
-      document.querySelector('.hidden-content').classList.remove('hidden-content-visible')
-      
-    }
-  }
-}
+      this.changeButtons(false);
+      document
+        .querySelector(".hidden-content")
+        .classList.remove("hidden-content-visible");
+    },
+  },
+};
 </script>
 
 <style scoped>
-
 #NavBar {
   width: 80%;
   margin: 0 auto;
@@ -77,17 +84,17 @@ export default {
 }
 
 .hidden-content-visible {
-    opacity: 1 !important;
-    visibility: visible !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 
-    /* https://www.geeksforgeeks.org/how-to-dim-entire-screen-except-a-fixed-area-using-javascript/
+  /* https://www.geeksforgeeks.org/how-to-dim-entire-screen-except-a-fixed-area-using-javascript/
        Accessed July 24th, 2020 */
 
-    /* For Internet Explorer */ 
-    box-shadow: 0 0 0 1000px rgba(0, 0, 0, .65); 
-      
-    /* For other browsers */ 
-    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .65); 
+  /* For Internet Explorer */
+  box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.65);
+
+  /* For other browsers */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.65);
 }
 
 .hidden-content {
@@ -108,12 +115,11 @@ export default {
  * Accessed July 28, 2020 */
 
 #container {
-  display: flex;                  /* establish flex container */
+  display: flex; /* establish flex container */
   justify-content: space-between; /* switched from default (flex-start, see below) */
 }
 
 #container > div {
   width: 200px;
 }
-
 </style>

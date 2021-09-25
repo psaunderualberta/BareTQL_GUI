@@ -1,13 +1,12 @@
 <template>
   <div id="seed-set">
-    <div class="centering" style="margin-bottom: 1%; ">
-      <Logo/>
+    <div class="centering" style="margin-bottom: 1%">
+      <Logo />
     </div>
-    <hr>
+    <hr />
     <div class="centering">
-      
       <!-- Form to submit keyword queries -->
-      <form v-on:submit.prevent="submitQuery" style="padding-top: 1%;">
+      <form v-on:submit.prevent="submitQuery" style="padding-top: 1%">
         <p v-if="errors.length">
           <strong>Please enter at least one keyword</strong>
         </p>
@@ -21,7 +20,7 @@
       </form>
     </div>
 
-    <div style="display: flex;">
+    <div style="display: flex">
       <!-- LHS of Page -->
       <div class="page">
         <div class="separate-components">
@@ -33,36 +32,45 @@
           <ul v-if="Object.keys(results).length > 0">
             <!-- Summary of results -->
             <p v-if="Object.keys(results).length === 20" class="centering">
-              These are the top 20 tables that match the keywords '{{ keywords }}'.
-              <br />Click on a title to view the table's rows.
+              These are the top 20 tables that match the keywords '{{
+                keywords
+              }}'. <br />Click on a title to view the table's rows.
             </p>
             <p v-else class="centering">
-              There are {{ Object.keys(results).length }} table(s) matching the keywords '{{ keywords }}'.
-              <br />Click on a title to view the table's rows.
+              There are {{ Object.keys(results).length }} table(s) matching the
+              keywords '{{ keywords }}'. <br />Click on a title to view the
+              table's rows.
             </p>
 
             <!-- Display for query results -->
-            <form style="font-size: 0.9em;">
-              <li v-for="(table, table_rank, index) in results" :key="index" class="top-most-li">
+            <form style="font-size: 0.9em">
+              <li
+                v-for="(table, table_rank, index) in results"
+                :key="index"
+                class="top-most-li"
+              >
                 <!-- Row title, clicking on title reveals rows of table
                 https://codepen.io/Idered/pen/AeBgF */-->
                 <input
                   type="checkbox"
                   class="read-more-state"
-                  :id="'_'+table_rank"
+                  :id="'_' + table_rank"
                   :value="table_rank"
                   v-model="clickedTables"
                 />
 
-                <label class="read-more-trigger" :for="'_'+table_rank">
-                  <span v-html="makeKeywordsBold(table['title'], keywords)"></span>
-                  :
-                  ({{ Object.keys(results[table_rank]['rows']).length }}
-                  {{ Object.keys(results[table_rank]['rows']).length > 1 ? ' matches from ' : ' match from ' }}
-                  {{ results[table_rank]['rowCount'] }} rows)
+                <label class="read-more-trigger" :for="'_' + table_rank">
                   <span
-                    v-if="isTableInSS(table['table_id'])"
-                  >***</span>
+                    v-html="makeKeywordsBold(table['title'], keywords)"
+                  ></span>
+                  : ({{ Object.keys(results[table_rank]["rows"]).length }}
+                  {{
+                    Object.keys(results[table_rank]["rows"]).length > 1
+                      ? " matches from "
+                      : " match from "
+                  }}
+                  {{ results[table_rank]["rowCount"] }} rows)
+                  <span v-if="isTableInSS(table['table_id'])">***</span>
                 </label>
 
                 <!-- Rows of table -->
@@ -75,15 +83,22 @@
                     >
                       <input
                         type="checkbox"
-                        :id="table_rank+'-'+rowID"
-                        :value="logRowInfo(rowContent, rowID, table['table_id'], table['title'])"
+                        :id="table_rank + '-' + rowID"
+                        :value="
+                          logRowInfo(
+                            rowContent,
+                            rowID,
+                            table['table_id'],
+                            table['title']
+                          )
+                        "
                         v-model="selectedRows"
                       />
                       <label
-                        :for="table_rank+'-'+rowID"
-                        v-html="'('
-                                 + makeKeywordsBold(rowContent, keywords)
-                                 + ')'"
+                        :for="table_rank + '-' + rowID"
+                        v-html="
+                          '(' + makeKeywordsBold(rowContent, keywords) + ')'
+                        "
                       ></label>
                     </p>
                   </div>
@@ -92,10 +107,9 @@
             </form>
           </ul>
           <!-- Only upon initialization of page -->
-          <p
-            v-else-if="typeof results === 'string'"
-            class="centering"
-          >Enter keywords and see the rows in your database which match!</p>
+          <p v-else-if="typeof results === 'string'" class="centering">
+            Enter keywords and see the rows in your database which match!
+          </p>
           <p v-else class="centering">No results for the previous query.</p>
         </div>
       </div>
@@ -106,7 +120,9 @@
           <!-- Display for selected seed set rows -->
           <div class="separate-components centering">
             <h3>Seed Set</h3>
-            <p v-if="table['numRows'] === 0">No seed set rows have been selected</p>
+            <p v-if="table['numRows'] === 0">
+              No seed set rows have been selected
+            </p>
             <div v-else>
               <!-- Table content -->
               <div class="no-overflow">
@@ -137,14 +153,14 @@ export default {
     UserTable,
   },
 
-  data: function() {
+  data: function () {
     return {
       document: document,
       clickedTables: [],
       selectedRows: [],
       keywords: "",
       results: "",
-      errors: []
+      errors: [],
     };
   },
 
@@ -154,7 +170,7 @@ export default {
        * assigns the result of the query (after formatting)
        * to the 'results' data
        */
-      var changeButton = function(button, content) {
+      var changeButton = function (button, content) {
         button.textContent = content;
         button.disabled = !button.disabled;
         button.classList.toggle("deactivate");
@@ -169,12 +185,12 @@ export default {
       if (keywords.length > 0) {
         changeButton(submitButton, "Loading...");
         ResultService.getKeywords(keywords.toLowerCase())
-          .then(data => {
+          .then((data) => {
             changeButton(submitButton, "Submit Query");
             this.results = data;
             this.keywords = keywords;
           })
-          .catch(err => {
+          .catch((err) => {
             changeButton(submitButton, err);
             console.log(err);
           });
@@ -192,7 +208,7 @@ export default {
        * emit event to change the page's mode */
       var tableIDs = [];
       var rowIDs = [];
-      this.selectedRows.forEach(row => {
+      this.selectedRows.forEach((row) => {
         tableIDs.push(row["tableID"]);
         rowIDs.push(row["rowID"]);
       });
@@ -201,7 +217,7 @@ export default {
         .then(() => {
           this.$emit("ChangeMode");
         })
-        .catch(err => {
+        .catch((err) => {
           console.log(err);
         });
     },
@@ -212,7 +228,7 @@ export default {
         rowContent: rowContent.split(/ *\|\| */),
         rowID: rowID,
         tableID: table_id,
-        origin: title
+        origin: title,
       };
     },
 
@@ -225,7 +241,7 @@ export default {
     isTableInSS(table_id) {
       /* Checks if a row from table_id is selected to
        * be in the seed set, if it is we record it in the DOM */
-      return this.selectedRows.some(row => row["tableID"] === table_id);
+      return this.selectedRows.some((row) => row["tableID"] === table_id);
     },
 
     makeKeywordsBold(str, keywords) {
@@ -233,22 +249,29 @@ export default {
        * https://x-team.com/blog/highlight-text-vue-regex/
        * Accessed June 9th, 2020
        */
-      return str.replace(new RegExp( `(?<=^|[^a-zA-Z-])(?:${keywords.split(/ *, */).join("|")})(?=[^a-zA-Z-]|$)`,"gi" ), match => {
+      return str.replace(
+        new RegExp(
+          `(?<=^|[^a-zA-Z-])(?:${keywords
+            .split(/ *, */)
+            .join("|")})(?=[^a-zA-Z-]|$)`,
+          "gi"
+        ),
+        (match) => {
           return "<strong>" + match + "</strong>";
         }
       );
-    }
+    },
   },
 
   computed: {
-    table: function() {
+    table: function () {
       /* Computes the seed-set table from this.selectedRows */
       var rows = [];
       var hidden = [];
       var numRows = 0;
       var numCols = 0;
 
-      this.selectedRows.forEach(row => {
+      this.selectedRows.forEach((row) => {
         hidden.push(row["hidden"]);
         row = row["rowContent"];
         numCols = Math.max(row.length, numCols);
@@ -260,15 +283,14 @@ export default {
         rows: rows,
         hidden: hidden,
         numRows: numRows,
-        numCols: numCols
+        numCols: numCols,
       };
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
-
 .top-most-li {
   margin: 1%;
 }

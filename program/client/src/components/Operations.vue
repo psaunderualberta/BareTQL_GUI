@@ -6,43 +6,47 @@
     </div>
     <div v-if="table['rows'].length > 0" class="separate-components centering">
       <h2>Seed Set</h2>
-      <hr class="hr-in-separate-components">
+      <hr class="hr-in-separate-components" />
 
       <div class="centering">
         <!-- Uniqueness checkboxes  -->
         <div class="container">
           <p>Select unique columns:</p>
-            <div
-              @click="colTagClick($event, uniqueCols)" 
-              class="col-checkboxes uniqueTags" 
-              v-for="col in numCols" :key="col"
-              >{{ col }}.</div>
-          
+          <div
+            @click="colTagClick($event, uniqueCols)"
+            class="col-checkboxes uniqueTags"
+            v-for="col in numCols"
+            :key="col"
+          >
+            {{ col }}.
+          </div>
         </div>
 
         <div class="container">
           <p v-if="incorrectRowsReturned()">
             <strong>Please choose a positive integer.</strong>
           </p>
-          <span>Select number of expanded rows: </span><input type="number" v-model="rowsReturned">
+          <span>Select number of expanded rows: </span
+          ><input type="number" v-model="rowsReturned" />
         </div>
 
         <!-- Deletion checkboxes  -->
         <div class="container">
           <p>Select columns to delete:</p>
-            <div
-              @click="colTagClick($event, deletions)" 
-              class="col-checkboxes deleteTags" 
-              v-for="col in numCols" :key="col"
-              >{{ col }}.</div>
-          <br>
+          <div
+            @click="colTagClick($event, deletions)"
+            class="col-checkboxes deleteTags"
+            v-for="col in numCols"
+            :key="col"
+          >
+            {{ col }}.
+          </div>
+          <br />
           <div class="container" v-if="deletions.length > 0">
             <div style="height: 3px"></div>
-            <button
-              v-on:submit.prevent
-              type="submit"
-              @click="deleteCols"
-            >Confirm Deletions</button>
+            <button v-on:submit.prevent type="submit" @click="deleteCols">
+              Confirm Deletions
+            </button>
           </div>
         </div>
       </div>
@@ -53,11 +57,13 @@
           <tr>
             <td v-for="col in numCols" :key="col">
               <div>
-                <p style="text-align: left;">
+                <p style="text-align: left">
                   <span>{{ col }}.</span>
                   <span v-if="uniqueCols.indexOf(col) !== -1">***</span>
                 </p>
-                <p class="slider-values">{{ stickiness(sliderValues[col - 1]) }}% Sticky</p>
+                <p class="slider-values">
+                  {{ stickiness(sliderValues[col - 1]) }}% Sticky
+                </p>
                 <input
                   type="range"
                   min="0"
@@ -74,12 +80,25 @@
       <div class="centering info">
         <p>'***': This column has been tagged as unique.</p>
       </div>
-      <ButtonList :arr="functions" origin="Operations" @NewClick="executeDotOp" />
-      
-      <UserTable :table="table" :allowSelection="true" @swap="swapCells" tableLayout="fixed"/>
-      <UserTable :table="expandedRows" :downloadable="true" :hoverEffect="true" tableLayout="fixed">
+      <ButtonList
+        :arr="functions"
+        origin="Operations"
+        @NewClick="executeDotOp"
+      />
+
+      <UserTable
+        :table="table"
+        :allowSelection="true"
+        @swap="swapCells"
+        tableLayout="fixed"
+      />
+      <UserTable
+        :table="expandedRows"
+        :downloadable="true"
+        :hoverEffect="true"
+        tableLayout="fixed"
+      >
       </UserTable>
-      
     </div>
     <div v-else class="centering separate-components">
       <h3>No seed set is selected. Please return to keyword search.</h3>
@@ -101,13 +120,13 @@ export default {
     UserTable,
   },
 
-  data: function() {
+  data: function () {
     return {
       functions: [{ message: "Expand Rows (XR)", value: "XR" }],
       expandedRows: { rows: [], info: [] },
-      table: {rows: []},
+      table: { rows: [] },
       sliderValues: [],
-      rowsReturned: 30, /* Default for user */
+      rowsReturned: 30 /* Default for user */,
       uniqueCols: [],
       deletions: [],
       numCols: 0,
@@ -118,7 +137,7 @@ export default {
   methods: {
     executeDotOp(op) {
       /* Executes the dot op selected by user */
-      var changeButtons = function(buttons, content) {
+      var changeButtons = function (buttons, content) {
         for (let key in Object.keys(buttons)) {
           buttons[key].textContent = content;
           buttons[key].disabled = !buttons[key].disabled;
@@ -127,24 +146,32 @@ export default {
       };
 
       if (this.incorrectRowsReturned()) {
-        return
+        return;
       }
 
       var submitButtons = document.querySelectorAll(".Operations");
       changeButtons(submitButtons, "Loading Results...");
 
-      if (this.sliderValues.every(val => val == "0")) {
-        changeButtons(submitButtons, "At least 1 slider value must be larger than 0.\n Please try again.")
-        this.expandedRows = { rows: [], info: [] }
-        return
+      if (this.sliderValues.every((val) => val == "0")) {
+        changeButtons(
+          submitButtons,
+          "At least 1 slider value must be larger than 0.\n Please try again."
+        );
+        this.expandedRows = { rows: [], info: [] };
+        return;
       }
 
-      ResultService.handleDotOps(op, this.sliderValues, this.uniqueCols, this.rowsReturned)
-        .then(data => {
-          changeButtons(submitButtons, this.functions[0]['message']);
+      ResultService.handleDotOps(
+        op,
+        this.sliderValues,
+        this.uniqueCols,
+        this.rowsReturned
+      )
+        .then((data) => {
+          changeButtons(submitButtons, this.functions[0]["message"]);
           this.expandedRows = this.handleResponse(data);
         })
-        .catch(err => {
+        .catch((err) => {
           changeButtons(submitButtons, "An error occurred. Please try again");
           console.log(err);
         });
@@ -153,13 +180,15 @@ export default {
     deleteCols() {
       /* Deletes all columns that the user has selected */
       ResultService.deleteCols(this.deletions)
-        .then(data => {
+        .then((data) => {
           this.table = this.handleResponse(data);
-          document.querySelectorAll('.deleteTags').forEach(tag => {tag.classList.remove('clicked')})
+          document.querySelectorAll(".deleteTags").forEach((tag) => {
+            tag.classList.remove("clicked");
+          });
           this.deletions = [];
-          this.expandedRows = { rows: [], info: [] }
+          this.expandedRows = { rows: [], info: [] };
         })
-        .catch(err => {
+        .catch((err) => {
           console.log(err);
         });
     },
@@ -178,7 +207,7 @@ export default {
         if (typeof data["info"] !== "undefined") tmp["info"] = data["info"];
 
         if (data["rows"].length > 0 && data["rows"][0].length > 0) {
-          data["rows"].forEach(row => {
+          data["rows"].forEach((row) => {
             row = row.split(" || ");
             this.numCols = Math.max(this.numCols, row.length);
             tmp["rows"].push(row);
@@ -192,10 +221,10 @@ export default {
     swapCells(indices) {
       /* Swaps the two cells selected by the user */
       ResultService.swapCells(indices)
-        .then(data => {
+        .then((data) => {
           this.table = this.handleResponse(data);
         })
-        .catch(err => {
+        .catch((err) => {
           console.log(err);
         });
     },
@@ -206,19 +235,19 @@ export default {
     },
 
     colTagClick(event, target) {
-      /* Add / remove the clicked column 
+      /* Add / remove the clicked column
        * from deletions / uniqueCols */
       var val = Number(event.target.textContent);
       var iO = target.indexOf(val);
       if (iO !== -1) {
-        target.splice(iO, 1)
-        event.target.classList.remove('clicked')
+        target.splice(iO, 1);
+        event.target.classList.remove("clicked");
       } else {
-        target.push(val)
-        event.target.classList.add('clicked');
+        target.push(val);
+        event.target.classList.add("clicked");
       }
-      return
-    },  
+      return;
+    },
 
     stickiness(stickyValue) {
       /* Determine 'stickiness' value to be displayed */
@@ -230,41 +259,40 @@ export default {
 
     incorrectRowsReturned() {
       /* Validates that rows returned are positive and an integer */
-      this.rowsReturned = Number(this.rowsReturned)
-      return this.rowsReturned < 0 || !Number.isInteger(this.rowsReturned)
-    }
+      this.rowsReturned = Number(this.rowsReturned);
+      return this.rowsReturned < 0 || !Number.isInteger(this.rowsReturned);
+    },
   },
 
   created() {
     /* Initial call to get the Seed Set from the API */
     ResultService.handleDotOps(undefined, this.sliderValues, this.uniqueCols)
-      .then(data => {
+      .then((data) => {
         this.table = this.handleResponse(data);
       })
-      .catch(err => {
+      .catch((err) => {
         console.log(err);
       });
   },
 
   updated() {
     /* Adjusts number of columns when table is updated */
-    this.table["rows"].forEach(row => {
+    this.table["rows"].forEach((row) => {
       this.numCols = Math.max(row.length, this.numCols);
     });
-  }
+  },
 };
 </script>
 
 
 <style scoped>
-
 p {
   margin: 0;
 }
 
 input[type="text"] {
   margin: 1% 2%;
-  width: 20%
+  width: 20%;
 }
 
 input[type="range"] {
@@ -302,23 +330,22 @@ input[type="range"] {
 }
 
 .extra-br-spacing {
-    display: block; 
-    margin: 3px 0;
+  display: block;
+  margin: 3px 0;
 }
-
 
 /* https://www.w3schools.com/howto/howto_js_rangeslider.asp */
 /* The slider itself */
 .slider {
-  -webkit-appearance: none;  /* Override default CSS styles */
+  -webkit-appearance: none; /* Override default CSS styles */
   appearance: none;
   width: 100%; /* Full-width */
   height: 15px; /* Specified height */
   background: #d3d3d3; /* Grey background */
   outline: none; /* Remove outline */
   opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
-  -webkit-transition: .2s; /* 0.2 seconds transition on hover */
-  transition: opacity .2s;
+  -webkit-transition: 0.2s; /* 0.2 seconds transition on hover */
+  transition: opacity 0.2s;
 }
 
 /* Mouse-over effects */
@@ -332,7 +359,7 @@ input[type="range"] {
   appearance: none;
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
-  background: #deb992; 
+  background: #deb992;
   cursor: pointer; /* Cursor on hover */
 }
 
@@ -340,7 +367,7 @@ input[type="range"] {
   width: 15%; /* Set a specific slider handle width */
   height: 15px; /* Slider handle height */
   border-radius: 0;
-  background: #deb992; 
+  background: #deb992;
   cursor: pointer; /* Cursor on hover */
 }
 </style>

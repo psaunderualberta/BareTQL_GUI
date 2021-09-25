@@ -5,19 +5,18 @@
 </template>
 
 <script>
-import Page from './components/Page.vue'
+import Page from "./components/Page.vue";
 
 export default {
-  name: 'App',
+  name: "App",
   components: {
-    Page
+    Page,
   },
-}
+};
 </script>
 
 <style>
 #app {
   margin-top: 0;
 }
-
 </style>
