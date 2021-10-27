@@ -120,3 +120,9 @@ In order to use BareTQL, you will need a database designed for BareTQL.
 ## Other Notes
  - It looks like the left most column of each table is treated as a key column, the key column is matched before any other column. Is this right? Is there a way to support multi-column keys in seed and data?
     - This is correct. We use the left-most column to filter the initial set of tables in the database so that later filtering is not as time consuming. As of right now, there is no way to support multi-column keys in the seed set, although setting the "stickiness" value of specific columns to be high will cause those columns to act as "pseudo-keys".
+
+
+# TODO
+1. Understand why some users do not see the results they are expecting (i.e. slack channel)
+2. Improve speed in returning keyword searches
+3. Precisely define the similarity metrics for both numerical & keyword data
