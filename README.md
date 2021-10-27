@@ -126,3 +126,6 @@ In order to use BareTQL, you will need a database designed for BareTQL.
 1. Understand why some users do not see the results they are expecting (i.e. slack channel)
 2. Improve speed in returning keyword searches
 3. Precisely define the similarity metrics for both numerical & keyword data
+
+# Sources:
+1. 
